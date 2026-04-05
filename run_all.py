@@ -58,7 +58,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "models" / "bcct"))
 
 from shared.config import (
     NUM_CLASSES, MODEL_NAMES, LOW_DATA_SHOTS, LOW_DATA_REPEATS,
-    GLOBAL_SEED, RESULTS_ROOT,
+    GLOBAL_SEED, RESULTS_ROOT, DATASET_CONFIGS,
 )
 from shared.data.data_loader import get_dataloaders, get_few_shot_loaders
 from shared.metrics import (
@@ -144,6 +144,15 @@ def get_args() -> argparse.Namespace:
             "Default: all active models in the registry."
         ),
     )
+    parser.add_argument(
+        "--dataset", type=str, default="raabin",
+        choices=["raabin", "bccd", "cytodata"],
+        help="Dataset to use for all models (default: raabin).",
+    )
+    parser.add_argument(
+        "--data_dir", type=str, default=None,
+        help="Local dataset root — required when --dataset cytodata.",
+    )
     parser.add_argument("--batch_size",  type=int,   default=32)
     parser.add_argument("--num_workers", type=int,   default=4)
     parser.add_argument("--cache_dir",   type=str,   default=None,
@@ -198,7 +207,8 @@ def run_train(
     print(f"  TRAINING: {entry['name']}")
     print(f"{'='*64}")
 
-    model = entry["constructor"](num_classes=NUM_CLASSES)
+    num_classes = DATASET_CONFIGS[args.dataset]["num_classes"]
+    model = entry["constructor"](num_classes=num_classes)
 
     t0 = time.time()
     model.train_model(train_loader, device=device)
@@ -269,6 +279,8 @@ def run_low_data(
     cache_dir:   Optional[str],
     batch_size:  int,
     num_workers: int,
+    dataset:     str = "raabin",
+    data_dir:    Optional[str] = None,
 ) -> Dict:
     """Run n-shot experiments for a single model."""
     summary = {}
@@ -284,6 +296,8 @@ def run_low_data(
             # Build few-shot train loader
             few_train_dl, _, _, _ = get_few_shot_loaders(
                 n_shot=n_shot,
+                dataset=dataset,
+                data_dir=data_dir,
                 batch_size=batch_size,
                 num_workers=num_workers,
                 cache_dir=cache_dir,
@@ -366,8 +380,10 @@ def main():
     print(f"\n[pipeline] Models to run: {[v['name'] for v in active_models.values()]}")
 
     # Load dataset once — shared across all models
-    print("\n[pipeline] Loading Raabin-WBC dataset …")
+    print(f"\n[pipeline] Loading dataset: {args.dataset} …")
     train_loader, val_loader, test_loader, label_map = get_dataloaders(
+        dataset=args.dataset,
+        data_dir=args.data_dir,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         cache_dir=args.cache_dir,
@@ -445,6 +461,7 @@ def main():
                     seed=args.seed, out_dir=model_out_dir,
                     cache_dir=args.cache_dir, batch_size=args.batch_size,
                     num_workers=args.num_workers,
+                    dataset=args.dataset, data_dir=args.data_dir,
                 )
 
         except Exception as exc:

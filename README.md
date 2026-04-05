@@ -59,17 +59,27 @@ early-leukemia-detection/
 
 ---
 
-## Dataset
+## Datasets
 
-**Raabin-WBC** (`polejowska/lcbsi-wbc-ap` on HuggingFace)
+Three datasets are supported, matching the proposal. Pass `--dataset <key>` to any entry point.
 
-5 white blood cell classes: Basophil, Eosinophil, Lymphocyte, Monocyte, Neutrophil.
-Pre-split: 70% train / 10% validation / 20% test. All images resized to 224×224.
-The dataset streams automatically on first run — no manual download needed.
+**Raabin-WBC** (`--dataset raabin`, default)
+Source: HuggingFace `polejowska/lcbsi-wbc-ap` — downloads automatically.
+5 WBC classes: Basophil, Eosinophil, Lymphocyte, Monocyte, Neutrophil.
+Pre-split 70/10/20. Includes Test-B (different microscope) for domain-shift evaluation.
+Normalisation: mean `[0.7442, 0.6384, 0.7516]`, std `[0.1580, 0.1914, 0.1225]`.
 
-Normalisation stats (pre-computed from the training split, stored in `shared/config.py`):
-- Mean: `[0.7442, 0.6384, 0.7516]`
-- Std: `[0.1580, 0.1914, 0.1225]`
+**BCCD** (`--dataset bccd`)
+Source: HuggingFace `keremberke/blood-cell-object-detection` — downloads automatically.
+3 classes: Platelet, RBC, WBC. Originally an object-detection dataset (COCO format).
+Each annotated bounding box is cropped and used as a classification sample.
+Normalisation: ImageNet defaults (mean `[0.485, 0.456, 0.406]`, std `[0.229, 0.224, 0.225]`).
+
+**CytoData** (`--dataset cytodata --data_dir /path/to/cytodata`)
+Source: Addenbrooke's Hospital, Cambridge — **not publicly available on HuggingFace**.
+Request access via [CambridgeCIA/CytoDiffusion](https://github.com/CambridgeCIA/CytoDiffusion).
+10 classes: Basophil, Eosinophil, Erythroblast, Lymphocyte, Monocyte, Myeloblast, Neutrophil, Platelet, Promyelocyte, Artefact.
+Expected local layout: `<data_dir>/{train,val,test}/<ClassName>/image.jpg`
 
 ---
 
@@ -119,6 +129,12 @@ python run_all.py --mode low_data
 # Run a single model
 python run_all.py --models bcct
 
+# Run on BCCD dataset
+python run_all.py --dataset bccd
+
+# Run on CytoData (local)
+python run_all.py --dataset cytodata --data_dir /path/to/cytodata
+
 # Common overrides
 python run_all.py --batch_size 64 --num_workers 8 --device cuda --seed 0
 ```
@@ -136,6 +152,8 @@ python run_all.py --batch_size 64 --num_workers 8 --device cuda --seed 0
 | `--shots` | `10 20 50` | Shot counts for low-data experiments |
 | `--num_repeats` | `3` | Independent repeats per shot count |
 | `--seed` | `42` | Global random seed |
+| `--dataset` | `raabin` | `raabin`, `bccd`, or `cytodata` |
+| `--data_dir` | `None` | Local dataset root (required for `cytodata`) |
 | `--output_dir` | `shared/results` | Root directory for all output files |
 
 ### Option 2 — BccT Standalone
@@ -145,11 +163,17 @@ python run_all.py --batch_size 64 --num_workers 8 --device cuda --seed 0
 ```bash
 cd models/bcct
 
-# Train on full dataset, save checkpoint
+# Train on Raabin-WBC (default)
 python main.py train
 
+# Train on BCCD
+python main.py train --dataset bccd
+
+# Train on CytoData (local)
+python main.py train --dataset cytodata --data_dir /path/to/cytodata
+
 # Train with custom options
-python main.py train --r 16 --ridge_lambda 1e-4 --batch_size 32 --output_dir ./results
+python main.py train --dataset raabin --r 16 --ridge_lambda 1e-4 --batch_size 32 --output_dir ./results
 
 # Evaluate a saved checkpoint on the test set
 python main.py evaluate --checkpoint checkpoints/bcct_model.pt --split test
@@ -165,6 +189,8 @@ python main.py full_pipeline --output_dir ./results
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--dataset` | `raabin` | `raabin`, `bccd`, or `cytodata` |
+| `--data_dir` | `None` | Local dataset root (required for `cytodata`) |
 | `--r` | `16` | Token Fusion merge budget per transformer block |
 | `--ridge_lambda` | `1e-4` | Ridge regularisation λ for pseudo-inverse solve |
 | `--d_hidden` | `3072` | FRC hidden layer width (default: 4 × 768) |
