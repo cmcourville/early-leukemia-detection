@@ -1,0 +1,10 @@
+# models/cytodiffusion/requirements.txt
+# TODO (Darshan): add model-specific dependencies here.
+#
+# Likely candidates for an LDM approach:
+#   diffusers>=0.27.0          # HuggingFace Diffusers (LDM / StableDiffusion)
+#   accelerate>=0.27.0         # mixed-precision + distributed training
+#   safetensors>=0.4.0         # safe model weight serialisation
+#
+# All models share the base requirements — install from project root first:
+#   pip install -r shared/requirements.txt
