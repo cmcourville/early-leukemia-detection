@@ -47,6 +47,15 @@ def get_args() -> argparse.Namespace:
 
     # Data
     parser.add_argument(
+        "--dataset", type=str, default="raabin",
+        choices=["raabin", "bccd", "cytodata"],
+        help="Dataset to train on (default: raabin)."
+    )
+    parser.add_argument(
+        "--data_dir", type=str, default=None,
+        help="Local dataset root — required when --dataset cytodata."
+    )
+    parser.add_argument(
         "--batch_size", type=int, default=32,
         help="Mini-batch size for feature collection (default: 32)."
     )
@@ -123,8 +132,10 @@ def train(args: Optional[argparse.Namespace] = None) -> BccTModel:
     print(f"[train] Device: {device}")
 
     # Data
-    print("[train] Loading Raabin-WBC dataset …")
+    print(f"[train] Loading dataset: {args.dataset}")
     train_loader, val_loader, test_loader, label_map = get_dataloaders(
+        dataset=args.dataset,
+        data_dir=getattr(args, "data_dir", None),
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         cache_dir=args.cache_dir,

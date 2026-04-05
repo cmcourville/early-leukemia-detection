@@ -33,6 +33,15 @@ import torch
 
 def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
+        "--dataset", type=str, default="raabin",
+        choices=["raabin", "bccd", "cytodata"],
+        help="Dataset to use: 'raabin' (default), 'bccd', or 'cytodata'."
+    )
+    parser.add_argument(
+        "--data_dir", type=str, default=None,
+        help="Local dataset root — required when --dataset cytodata."
+    )
+    parser.add_argument(
         "--device", type=str, default=None,
         help="Device: 'cpu', 'cuda', 'cuda:0' etc. Auto-detected if omitted."
     )
