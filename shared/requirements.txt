@@ -1,0 +1,14 @@
+# shared/requirements.txt — CS 534, Team 6
+# Base dependencies shared by all three models.
+# Install with: pip install -r shared/requirements.txt
+
+torch>=2.1.0
+torchvision>=0.16.0
+transformers>=4.38.0
+datasets>=2.18.0
+huggingface-hub>=0.21.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+Pillow>=9.5.0
+matplotlib>=3.7.0
+tqdm>=4.65.0
