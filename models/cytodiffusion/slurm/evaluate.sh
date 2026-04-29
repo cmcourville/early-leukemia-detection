@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=cyto_evaluate
-#SBATCH --partition=gpu
+#SBATCH --partition=quick
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G

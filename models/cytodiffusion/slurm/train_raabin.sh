@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=cyto_train_raabin
-#SBATCH --partition=gpu           # change to your cluster's GPU partition
+#SBATCH --partition=short
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G

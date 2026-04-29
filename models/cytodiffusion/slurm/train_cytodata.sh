@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=cyto_train_cytodata
-#SBATCH --partition=gpu
+#SBATCH --partition=short
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
