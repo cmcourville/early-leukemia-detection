@@ -110,6 +110,13 @@ def get_args() -> argparse.Namespace:
         "--device", type=str, default=None,
         help="Device: 'cpu', 'cuda', or 'cuda:N'. Auto-detected if None."
     )
+    parser.add_argument(
+        "--hf_token", type=str, default=None,
+        help=(
+            "HuggingFace API token for gated datasets (e.g. Raabin-WBC). "
+            "If omitted, the cached token from `huggingface-cli login` is used."
+        ),
+    )
 
     return parser.parse_args()
 
@@ -140,6 +147,7 @@ def train(args: Optional[argparse.Namespace] = None) -> BccTModel:
         num_workers=args.num_workers,
         cache_dir=args.cache_dir,
         pin_memory=(device.type == "cuda"),
+        hf_token=getattr(args, "hf_token", None),
     )
     print(f"[train] Label map: {label_map}")
 
