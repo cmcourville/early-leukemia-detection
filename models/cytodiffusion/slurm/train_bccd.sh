@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=cyto_train_bccd
 #SBATCH --partition=short
+#SBATCH --account=cngan
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
