@@ -291,7 +291,7 @@ def patch_token_fusion_hooks(
         self_attn_module = vit_layer.attention.attention
 
         def _make_patched(sa_mod, st):
-            def patched(hidden_states, head_mask=None, output_attentions=False):
+            def patched(hidden_states, head_mask=None, output_attentions=False, **kwargs):
                 import math as _m
                 mixed_query = sa_mod.query(hidden_states)
                 k_proj = sa_mod.key(hidden_states)
@@ -304,9 +304,20 @@ def patch_token_fusion_hooks(
                 k_bar  = k_proj.view(B, N, H, d_h).mean(dim=2)   # (B, N, d_h)
                 st.keys = k_bar[:, 1:, :].detach()                # (B, N_patch, d_h)
 
-                key_layer   = sa_mod.transpose_for_scores(k_proj)
-                val_layer   = sa_mod.transpose_for_scores(v_proj)
-                qry_layer   = sa_mod.transpose_for_scores(mixed_query)
+                # transformers API compatibility:
+                #   <=4.x exposes ViTSelfAttention.transpose_for_scores()
+                #   >=5.x removed it; reshape+transpose is done inline.
+                if hasattr(sa_mod, "transpose_for_scores"):
+                    key_layer = sa_mod.transpose_for_scores(k_proj)
+                    val_layer = sa_mod.transpose_for_scores(v_proj)
+                    qry_layer = sa_mod.transpose_for_scores(mixed_query)
+                    legacy_attention_api = True
+                else:
+                    new_shape = (B, -1, H, d_h)
+                    key_layer = k_proj.view(*new_shape).transpose(1, 2)
+                    val_layer = v_proj.view(*new_shape).transpose(1, 2)
+                    qry_layer = mixed_query.view(*new_shape).transpose(1, 2)
+                    legacy_attention_api = False
 
                 attn_scores = torch.matmul(qry_layer, key_layer.transpose(-1, -2))
                 attn_scores = attn_scores / _m.sqrt(d_h)
@@ -317,7 +328,15 @@ def patch_token_fusion_hooks(
                     attn_scores = attn_scores + log_z[:, None, None, :]
 
                 attn_probs = torch.nn.functional.softmax(attn_scores, dim=-1)
-                attn_probs = sa_mod.dropout(attn_probs)
+                if hasattr(sa_mod, "dropout"):
+                    attn_probs = sa_mod.dropout(attn_probs)
+                else:
+                    p = float(getattr(sa_mod, "dropout_prob", 0.0))
+                    attn_probs = torch.nn.functional.dropout(
+                        attn_probs,
+                        p=p,
+                        training=sa_mod.training,
+                    )
                 if head_mask is not None:
                     attn_probs = attn_probs * head_mask
 
@@ -325,7 +344,12 @@ def patch_token_fusion_hooks(
                 ctx = ctx.permute(0, 2, 1, 3).contiguous()
                 ctx = ctx.view(ctx.size()[:-2] + (sa_mod.all_head_size,))
 
-                return (ctx, attn_probs) if output_attentions else (ctx,)
+                # Return-shape compatibility:
+                #   <=4.x may expect (ctx,) when output_attentions=False
+                #   >=5.x ViTAttention unconditionally unpacks two values.
+                if legacy_attention_api:
+                    return (ctx, attn_probs) if output_attentions else (ctx,)
+                return (ctx, attn_probs)
 
             return patched
 
@@ -337,11 +361,19 @@ def patch_token_fusion_hooks(
         def make_layer_hook(st: BlockState, layer_i: int):
             def layer_post_hook(module, args, output):
                 """
-                output from ViTLayer.forward is a tuple:
-                    (hidden_states,) or (hidden_states, attn_weights)
-                hidden_states shape: (B, N_current, D)
+                output from ViTLayer.forward can be:
+                  - transformers <=4.x: tuple where output[0] is hidden_states
+                  - transformers >=5.x: hidden_states tensor directly
+                hidden_states has shape (B, N_current, D)
                 """
-                hidden = output[0]          # (B, N_current, D)
+                if isinstance(output, tuple):
+                    hidden = output[0]      # (B, N_current, D)
+                    tail = output[1:]
+                    tuple_output = True
+                else:
+                    hidden = output         # (B, N_current, D)
+                    tail = ()
+                    tuple_output = False
                 B, N_current, D = hidden.shape
 
                 # Initialise token_sizes on the very first block
@@ -385,7 +417,9 @@ def patch_token_fusion_hooks(
                 st.keys        = keys_new
 
                 # Return modified sequence (preserving tuple structure)
-                return (hidden_new,) + output[1:]
+                if tuple_output:
+                    return (hidden_new,) + tail
+                return hidden_new
 
             return layer_post_hook
 
