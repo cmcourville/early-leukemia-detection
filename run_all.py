@@ -53,7 +53,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "shared"))
 sys.path.insert(0, str(PROJECT_ROOT / "models" / "bcct"))
-# sys.path.insert(0, str(PROJECT_ROOT / "models" / "cytodiffusion"))   # UNCOMMENT WHEN READY
+sys.path.insert(0, str(PROJECT_ROOT / "models"))                        # cytodiffusion + vitcnn_ensemble
 # sys.path.insert(0, str(PROJECT_ROOT / "models" / "vitcnn_ensemble")) # UNCOMMENT WHEN READY
 
 from shared.config import (
@@ -72,9 +72,8 @@ from shared.metrics import (
 from bcct_model import BccTModel
 from token_fusion import reset_token_sizes
 
-# CytoDiffusion (Darshan) — NOT YET IMPLEMENTED
-# UNCOMMENT WHEN READY:
-# from cytodiffusion.model import CytoDiffusionModel
+# CytoDiffusion (Darshan)
+from cytodiffusion.model import CytoDiffusionModel
 
 # ViT-CNN Ensemble (Sean) — NOT YET IMPLEMENTED
 # UNCOMMENT WHEN READY:
@@ -99,17 +98,16 @@ MODEL_REGISTRY = {
         "load_fn":  lambda path, device: BccTModel.load(path, device),
     },
 
-    # CytoDiffusion (Darshan) — UNCOMMENT WHEN READY
-    # "cytodiffusion": {
-    #     "name":        "CytoDiffusion (Darshan)",
-    #     "active":      True,
-    #     "constructor": lambda num_classes, **kw: CytoDiffusionModel(
-    #         num_classes=num_classes,
-    #     ),
-    #     "checkpoint_path": "models/cytodiffusion/checkpoints/cytodiffusion_model.pt",
-    #     "save_fn":  lambda model, path: model.save(path),
-    #     "load_fn":  lambda path, device: CytoDiffusionModel.load(path, device),
-    # },
+    "cytodiffusion": {
+        "name":        "CytoDiffusion (Darshan)",
+        "active":      True,
+        "constructor": lambda num_classes, **kw: CytoDiffusionModel(
+            num_classes=num_classes,
+        ),
+        "checkpoint_path": "models/cytodiffusion/checkpoints/cytodiffusion_model.pt",
+        "save_fn":  lambda model, path: model.save(path),
+        "load_fn":  lambda path, device: CytoDiffusionModel.load(path, device),
+    },
 
     # ViT-CNN Ensemble (Sean) — UNCOMMENT WHEN READY
     # "vitcnn_ensemble": {
