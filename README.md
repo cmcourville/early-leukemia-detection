@@ -16,7 +16,7 @@ Comparative study of three deep learning approaches for early leukemia detection
 | Shared infrastructure (config, metrics, data_loader, run_all.py) | Corrin | ✅ Complete | Supports raabin, bccd, cnmc, cytodata |
 | Raabin-WBC local dataset | Corrin | ✅ Available | `data/raabin/` — run `prepare_raabin.py` to split |
 | CytoData local dataset | Corrin | ✅ Available | `data/cytodata/` — 3,500 / 494 / 1,000 train/val/test, 10 classes |
-| CytoDiffusion model code | Darshan | ❌ Stub only | `models/cytodiffusion/` — raises NotImplementedError |
+| CytoDiffusion model code | Darshan | ✅ Complete | `models/cytodiffusion/` — implemented and integrated into pipeline |
 | ViT-CNN Ensemble model code | Sean | ❌ Stub only | `models/vitcnn_ensemble/` — raises NotImplementedError |
 
 ### Experiment Results — Current State
@@ -119,9 +119,9 @@ Content included:
 - **11 new APA references** (all 2007–2021, published journals)
 - **Formatting checklist** (margins, font, page count, consistency items)
 
-**4. 🔴 Cross-model comparison once teammates' models are ready**
+**4. 🔴 Cross-model comparison once Sean's model is ready**
 
-When Darshan and Sean uncomment their registry entries in `run_all.py`:
+CytoDiffusion is now fully integrated. Once Sean uncomments his registry entry in `run_all.py`:
 
 ```bash
 python run_all.py --dataset raabin --data_dir data/raabin --mode full_pipeline
@@ -146,6 +146,7 @@ Upload to YouTube (unlisted) or Google Drive (shareable link).
 
 | Date | Author | Change |
 |------|--------|--------|
+| Apr 30, 2026 | Corrin | Integrated CytoDiffusion into `run_all.py` pipeline. Changes: `run_train()` now passes `val_loader`, dataset-correct `img_mean`/`img_std`, and `cache_dir` to each model constructor; uses `inspect.signature` to pass `val_loader` only to models that declare it (backward-compatible with BccT). CytoDiffusion registry constructor updated to forward those kwargs. `CytoDiffusionModel.__init__` now accepts `cache_dir` and passes it to `AutoencoderKL.from_pretrained()`. README updated: CytoDiffusion marked ✅ Complete, added How CytoDiffusion Works section, updated Adding Your Model to Sean-only. |
 | Apr 21, 2026 | Corrin | Wrote all missing final paper sections flagged for professor grade deductions — saved to `paper_additions_draft.md`. Includes: Abstract (≤200 words), Keywords (10 terms), target demographic + global epidemiology with citations, 3 real-world outcome examples (Krull 2013 neurocognitive, van der Pal 2012 cardiotoxicity, Bhatia 2007 secondary malignancy), disadvantages for all 3 SOTA methods, 11 new APA references, and a formatting checklist. README updated: marked step 3 ✅ COMPLETE, renumbered remaining steps. |
 | Apr 18, 2026 | Corrin | Built Phase 3 slides for Corrin's sections — 8-slide PPTX at `corrin_phase3_slides.pptx`. Covers BccT method (Token Fusion + FRC), pipeline diagram, Raabin-WBC results, CytoData results, low-data n-shot performance, conclusions, and future work. All metrics drawn from completed experiment results in `shared/results/`. Marked Build Phase 3 slides ✅ COMPLETE in Remaining Steps. |
 | Apr 17, 2026 | Corrin | CytoData 50-shot experiment confirmed complete — results were already in `shared/results/cytodata/bcct/low_data/50shot/avg_metrics.json` (Acc=0.6023, F1=0.5452, AUROC=0.9020, Sens=0.6477, 3 repeats). `low_data_summary.json` already rebuilt with all three shot counts. Updated README: marked CytoData benchmark ✅ COMPLETE, filled in 50-shot row in results table, revised Remaining Steps to remove the completed experiment. All of Corrin's experimental work is now done. |
@@ -160,7 +161,7 @@ Upload to YouTube (unlisted) or Google Drive (shareable link).
 | Teammate | Model | Status | Directory |
 |----------|-------|--------|-----------|
 | Corrin | **BccT** — Blood Cell Classification Transformer (Zhu et al. 2026) | ✅ Implemented | `models/bcct/` |
-| Darshan | **CytoDiffusion** — Latent Diffusion-based classifier | 🔲 Stub | `models/cytodiffusion/` |
+| Darshan | **CytoDiffusion** — Latent Diffusion-based classifier | ✅ Implemented | `models/cytodiffusion/` |
 | Sean | **ViT-CNN Ensemble** — Hybrid Vision Transformer + CNN | 🔲 Stub | `models/vitcnn_ensemble/` |
 
 ---
@@ -209,9 +210,9 @@ early-leukemia-detection/
     │   ├── requirements.txt          # BccT-specific dependencies
     │   └── checkpoints/              # Saved model weights (gitignored)
     │
-    ├── cytodiffusion/                # CytoDiffusion (Darshan) — stubs only
-    │   ├── model.py                  # Interface defined, raises NotImplementedError
-    │   ├── train.py
+    ├── cytodiffusion/                # CytoDiffusion (Darshan) — fully implemented
+    │   ├── model.py                  # SD VAE encoder + MLP head; train_model / forward / save / load
+    │   ├── train.py                  # Standalone training script
     │   ├── evaluate.py
     │   ├── requirements.txt
     │   └── checkpoints/
@@ -526,7 +527,7 @@ shared/results/
 │       ├── 10shot/avg_metrics.json   # Per-repeat breakdown for 10-shot
 │       ├── 20shot/avg_metrics.json
 │       └── 50shot/avg_metrics.json
-├── cytodiffusion/                    # Populated when Darshan's model is ready
+├── cytodiffusion/                    # Populated by CytoDiffusion runs
 ├── vitcnn_ensemble/                  # Populated when Sean's model is ready
 └── comparison_table.txt              # Side-by-side ASCII table (all models)
 ```
@@ -567,13 +568,77 @@ The `shared/` directory enforces experimental consistency across all three model
 
 ---
 
-## Adding Your Model (Darshan / Sean)
+## How CytoDiffusion Works
 
-1. Implement `model.py`, `train.py`, and `evaluate.py` in your model's directory. The stub files define the expected interface — each model needs `__init__`, `train_model(loader, device)`, `forward(x)`, `save(path)`, and `load(path, device)`.
+CytoDiffusion uses the VAE encoder from a pretrained Stable Diffusion model as a fixed feature extractor, then trains a lightweight MLP head on top via standard cross-entropy.
+
+### Architecture
+
+```
+Input (B, 3, 224, 224) — dataset-normalised
+  → denormalize to [0,1] → remap to [-1,1]
+  → SD VAE encoder (runwayml/stable-diffusion-v1-5, frozen by default)
+  → latent (B, 4, 28, 28)
+  → AdaptiveAvgPool2d(8, 8) → flatten → (B, 256)
+  → Linear(256→512) → GELU → Dropout(0.3)
+  → Linear(512→256) → GELU → Dropout(0.15)
+  → Linear(256→num_classes)
+  → logits (B, num_classes)
+```
+
+The VAE's perceptual bottleneck separates cell morphology in latent space. The 256-dim pooled representation is compact enough that a 3-layer MLP reaches strong accuracy without requiring full diffusion model training.
+
+### Training Procedure
+
+1. Load the SD VAE encoder from HuggingFace. Freeze all encoder parameters (default).
+2. For each epoch, forward-pass each batch: denormalize → remap to [-1,1] → encode → pool → MLP → cross-entropy loss with label smoothing (0.1).
+3. Optimise with AdamW (`lr=1e-3`, `weight_decay=1e-4`) and cosine annealing (`T_max=epochs`, `eta_min=lr×0.01`).
+4. Gradient clipping (`max_norm=1.0`) applied each step.
+5. The MLP head is re-initialised from scratch at the start of each `train_model()` call — this ensures low-data / few-shot experiments start clean.
+6. Checkpoint saves only the pool + classifier weights when the encoder is frozen (~2 MB). Encoder weights are always reloaded from HuggingFace (or local cache) at `load()` time.
+
+### Key Differences from BccT
+
+| Property | BccT | CytoDiffusion |
+|----------|------|---------------|
+| Backbone | ViT-Base (language-pretrained) | SD VAE (image-generation pretrained) |
+| Training | Closed-form (no backprop) | Gradient-based (30 epochs) |
+| Feature dim | 768 (CLS token) | 256 (pooled latent) |
+| Checkpoint size | ~60 MB | ~2 MB (frozen encoder) |
+| GPU required | No (CPU feasible) | Recommended (VAE encode on CPU is slow) |
+
+### Running CytoDiffusion
+
+```bash
+# Train + evaluate + low-data on Raabin-WBC
+python run_all.py --models cytodiffusion --dataset raabin --data_dir data/raabin
+
+# Train only
+python run_all.py --models cytodiffusion --dataset raabin --data_dir data/raabin --mode train
+
+# Evaluate from checkpoint
+python run_all.py --models cytodiffusion --dataset raabin --data_dir data/raabin --mode evaluate
+
+# All three primary datasets sequentially
+python run_all.py --models cytodiffusion --dataset all
+
+# Specify a HuggingFace cache dir (avoids re-downloading the ~4GB VAE weights)
+python run_all.py --models cytodiffusion --dataset raabin --data_dir data/raabin --cache_dir ~/.cache/huggingface
+```
+
+**First run** will download the SD VAE weights (~4 GB) from HuggingFace. Subsequent runs use the local cache. Set `--cache_dir` to control where they land.
+
+---
+
+## Adding Your Model (Sean)
+
+CytoDiffusion is already integrated. For ViT-CNN Ensemble:
+
+1. Implement `model.py`, `train.py`, and `evaluate.py` in `models/vitcnn_ensemble/`. The interface each model must satisfy: `__init__`, `train_model(loader, device)`, `forward(x)`, `save(path)`, `load(path, device)`.
 2. Use `shared/data/data_loader.py` for data loading and `shared/metrics.py` for evaluation — this keeps all results directly comparable.
-3. In `run_all.py`, uncomment your model's import line and registry entry (both marked `# UNCOMMENT WHEN READY`).
-4. Add your dependencies to your model's `requirements.txt`.
-5. Test in isolation first: `python run_all.py --models <your_key> --dataset bccd --mode train`
+3. In `run_all.py`, uncomment the `vitcnn_ensemble` import line and registry entry (both marked `# UNCOMMENT WHEN READY`).
+4. Add your dependencies to `models/vitcnn_ensemble/requirements.txt`.
+5. Test in isolation first: `python run_all.py --models vitcnn_ensemble --dataset bccd --mode train`
 
 ---
 
