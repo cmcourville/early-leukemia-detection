@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=06:00:00
-#SBATCH --output=logs/train_raabin_%j.out
-#SBATCH --error=logs/train_raabin_%j.err
+#SBATCH --output=train_raabin_%j.out
+#SBATCH --error=train_raabin_%j.err
 
 # models/cytodiffusion/slurm/train_raabin.sh
 # Train CytoDiffusionModel on Raabin-WBC (primary benchmark).

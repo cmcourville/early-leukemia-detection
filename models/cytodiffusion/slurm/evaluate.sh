@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --time=01:00:00
-#SBATCH --output=logs/evaluate_%j.out
-#SBATCH --error=logs/evaluate_%j.err
+#SBATCH --output=evaluate_%j.out
+#SBATCH --error=evaluate_%j.err
 
 # models/cytodiffusion/slurm/evaluate.sh
 # Evaluate CytoDiffusionModel on a given dataset.

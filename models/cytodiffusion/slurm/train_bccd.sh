@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --time=01:00:00
-#SBATCH --output=logs/train_bccd_%j.out
-#SBATCH --error=logs/train_bccd_%j.err
+#SBATCH --output=train_bccd_%j.out
+#SBATCH --error=train_bccd_%j.err
 
 # models/cytodiffusion/slurm/train_bccd.sh
 # Train CytoDiffusionModel on BCCD (3-class cross-domain benchmark).

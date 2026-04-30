@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=04:00:00
-#SBATCH --output=logs/low_data_%j.out
-#SBATCH --error=logs/low_data_%j.err
+#SBATCH --output=low_data_%j.out
+#SBATCH --error=low_data_%j.err
 
 # models/cytodiffusion/slurm/low_data.sh
 # Low-data (n-shot) experiments for CytoDiffusionModel.

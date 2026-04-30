@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=03:00:00
-#SBATCH --output=logs/train_cytodata_%j.out
-#SBATCH --error=logs/train_cytodata_%j.err
+#SBATCH --output=train_cytodata_%j.out
+#SBATCH --error=train_cytodata_%j.err
 
 # models/cytodiffusion/slurm/train_cytodata.sh
 # Train CytoDiffusionModel on CytoData (10-class, Addenbrooke's Hospital).
