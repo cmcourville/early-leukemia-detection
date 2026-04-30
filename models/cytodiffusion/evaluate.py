@@ -42,7 +42,7 @@ def get_args() -> argparse.Namespace:
     p.add_argument("--checkpoint",  type=str,   default=None,
                    help="Path to .pt checkpoint (auto-detected if omitted).")
     p.add_argument("--dataset",     type=str,   default="raabin",
-                   choices=["raabin", "bccd", "cytodata"])
+                   choices=["raabin", "bccd", "cytodata", "cnmc"])
     p.add_argument("--data_dir",    type=str,   default=None)
     p.add_argument("--split",       type=str,   default="test",
                    choices=["val", "test"])

@@ -137,7 +137,26 @@ DATASET_CONFIGS = {
             "Class names above should match your local folder names exactly."
         ),
     },
+    # C-NMC 2019 — binary leukemia classification (ALL vs HEM).
+    # Publicly available on HuggingFace as dwb2023/cnmc-leukemia-2019.
+    # Labels are strings: "all" (cancer) → 1, "hem" (healthy) → 0.
+    "cnmc": {
+        "display_name": "C-NMC 2019",
+        "hf_name":      "dwb2023/cnmc-leukemia-2019",
+        "num_classes":  2,
+        "class_names":  ["HEM", "ALL"],   # 0=healthy, 1=cancer
+        "mean":         [0.485, 0.456, 0.406],
+        "std":          [0.229, 0.224, 0.225],
+        "source":       "huggingface",
+        "task":         "classification",
+        "hf_splits":    {"train": "train", "val": None, "test": "test"},
+        "notes": (
+            "C-NMC 2019 leukemia dataset. Binary classification: "
+            "HEM (normal, class 0) vs ALL (cancer, class 1). "
+            "No validation split — 10% of train is held out automatically."
+        ),
+    },
 }
 
 # Convenience: valid dataset keys
-DATASET_KEYS = list(DATASET_CONFIGS.keys())   # ["raabin", "bccd", "cytodata"]
+DATASET_KEYS = list(DATASET_CONFIGS.keys())   # ["raabin", "bccd", "cytodata", "cnmc"]
