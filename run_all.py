@@ -36,6 +36,7 @@ Outputs (written to shared/results/):
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
 import sys
@@ -103,6 +104,9 @@ MODEL_REGISTRY = {
         "active":      True,
         "constructor": lambda num_classes, **kw: CytoDiffusionModel(
             num_classes=num_classes,
+            cache_dir=kw.get("cache_dir"),
+            img_mean=kw.get("img_mean"),
+            img_std=kw.get("img_std"),
         ),
         "checkpoint_path": "models/cytodiffusion/checkpoints/cytodiffusion_model.pt",
         "save_fn":  lambda model, path: model.save(path),
@@ -209,6 +213,7 @@ def run_train(
     args:      argparse.Namespace,
     device:    torch.device,
     train_loader,
+    val_loader,
     label_map: Dict,
 ) -> object:
     """Train a single model and return the trained model instance."""
@@ -216,11 +221,21 @@ def run_train(
     print(f"  TRAINING: {entry['name']}")
     print(f"{'='*64}")
 
-    num_classes = DATASET_CONFIGS[args.dataset]["num_classes"]
-    model = entry["constructor"](num_classes=num_classes)
+    ds_cfg = DATASET_CONFIGS[args.dataset]
+    num_classes = ds_cfg["num_classes"]
+    model = entry["constructor"](
+        num_classes=num_classes,
+        cache_dir=args.cache_dir,
+        img_mean=ds_cfg["mean"],
+        img_std=ds_cfg["std"],
+    )
 
     t0 = time.time()
-    model.train_model(train_loader, device=device)
+    sig = inspect.signature(model.train_model)
+    if "val_loader" in sig.parameters:
+        model.train_model(train_loader, device=device, val_loader=val_loader)
+    else:
+        model.train_model(train_loader, device=device)
     elapsed = time.time() - t0
     print(f"[pipeline] Training complete in {elapsed:.1f}s")
 
@@ -450,6 +465,7 @@ def _run_single_dataset(args: argparse.Namespace, device: torch.device) -> None:
                     args=args,
                     device=device,
                     train_loader=train_loader,
+                    val_loader=val_loader,
                     label_map=label_map,
                 )
                 model_cache[model_key] = model

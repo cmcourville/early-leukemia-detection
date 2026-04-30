@@ -71,6 +71,7 @@ class CytoDiffusionModel(nn.Module):
         lr_head:      float = 1e-3,
         lr_encoder:   float = 1e-5,
         weight_decay: float = 1e-4,
+        cache_dir:    Optional[str] = None,
     ):
         super().__init__()
 
@@ -92,6 +93,7 @@ class CytoDiffusionModel(nn.Module):
             lr_head=lr_head,
             lr_encoder=lr_encoder,
             weight_decay=weight_decay,
+            cache_dir=cache_dir,
         )
 
         # Per-dataset normalization buffers; used to convert the
@@ -108,7 +110,7 @@ class CytoDiffusionModel(nn.Module):
         # VAE encoder (pretrained SD weights)
         print(f"[CytoDiffusion] Loading VAE encoder from {sd_model_id} …")
         self.encoder: AutoencoderKL = AutoencoderKL.from_pretrained(
-            sd_model_id, subfolder=_SD_SUBFOLDER
+            sd_model_id, subfolder=_SD_SUBFOLDER, cache_dir=cache_dir
         )
         if freeze_encoder:
             for p in self.encoder.parameters():
