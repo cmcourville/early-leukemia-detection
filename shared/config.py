@@ -149,11 +149,11 @@ DATASET_CONFIGS = {
         "std":          [0.229, 0.224, 0.225],
         "source":       "huggingface",
         "task":         "classification",
-        "hf_splits":    {"train": "train", "val": None, "test": "test"},
+        "hf_splits":    {"train": "train", "val": None, "test": None},
         "notes": (
             "C-NMC 2019 leukemia dataset. Binary classification: "
             "HEM (normal, class 0) vs ALL (cancer, class 1). "
-            "No validation split — 10% of train is held out automatically."
+            "Only a train split exists — val (10%) and test (20%) are carved out automatically."
         ),
     },
 }

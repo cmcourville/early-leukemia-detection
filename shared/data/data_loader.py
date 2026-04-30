@@ -443,15 +443,18 @@ def _load_cnmc(
             return image, int(lbl)
 
     print(f"[shared/data] Loading C-NMC 2019 ({cfg['hf_name']}) …")
-    hf_train_full = _load(cfg["hf_name"], split="train", **kw)
-    hf_test       = _load(cfg["hf_name"], split="test",  **kw)
+    hf_full = _load(cfg["hf_name"], split="train", **kw)
 
-    # No official val split — carve 10% from train
-    n_total = len(hf_train_full)
+    # Only a train split exists — carve out val (10%) and test (20%) manually
+    n_total = len(hf_full)
+    n_test  = max(1, int(0.20 * n_total))
     n_val   = max(1, int(0.10 * n_total))
-    split   = hf_train_full.train_test_split(test_size=n_val, seed=GLOBAL_SEED)
-    hf_train = split["train"]
-    hf_val   = split["test"]
+
+    tmp      = hf_full.train_test_split(test_size=n_test, seed=GLOBAL_SEED)
+    hf_test  = tmp["test"]
+    tmp2     = tmp["train"].train_test_split(test_size=n_val, seed=GLOBAL_SEED)
+    hf_train = tmp2["train"]
+    hf_val   = tmp2["test"]
 
     train_tf = get_train_transform(cfg["mean"], cfg["std"])
     eval_tf  = get_eval_transform(cfg["mean"],  cfg["std"])
