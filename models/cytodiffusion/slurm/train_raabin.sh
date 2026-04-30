@@ -19,7 +19,7 @@
 
 set -e
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+PROJECT_ROOT="$SLURM_SUBMIT_DIR"
 CONDA_ENV_NAME="cyto534"
 HF_CACHE="$PROJECT_ROOT/.hf_cache"
 

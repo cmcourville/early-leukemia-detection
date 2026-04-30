@@ -28,7 +28,7 @@ set -e
 
 DATASET="${DATASET:-raabin}"
 DATA_DIR="${DATA_DIR:-}"
-PROJECT_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+PROJECT_ROOT="$SLURM_SUBMIT_DIR"
 CONDA_ENV_NAME="cyto534"
 
 echo "[evaluate] Dataset: $DATASET"

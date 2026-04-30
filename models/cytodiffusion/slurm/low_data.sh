@@ -27,7 +27,7 @@ set -e
 DATASET="${DATASET:-raabin}"
 DATA_DIR="${DATA_DIR:-}"
 HF_CACHE_DIR="${HF_CACHE:-}"
-PROJECT_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+PROJECT_ROOT="$SLURM_SUBMIT_DIR"
 CONDA_ENV_NAME="cyto534"
 
 echo "[low_data] Dataset: $DATASET"

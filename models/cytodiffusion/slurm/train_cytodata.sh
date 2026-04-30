@@ -26,7 +26,7 @@ set -e
 CYTODATA_DIR="$HOME/data/cytodata"    # path to prepared ImageFolder directory
 # ──────────────────────────────────────────────────────────────────────────────
 
-PROJECT_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+PROJECT_ROOT="$SLURM_SUBMIT_DIR"
 CONDA_ENV_NAME="cyto534"
 
 echo "[train_cytodata] Job ID      : $SLURM_JOB_ID"
