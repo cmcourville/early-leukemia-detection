@@ -448,7 +448,7 @@ def _load_cnmc(
                 image = self.transform(image)
             lbl = item[self.lbl_col]
             if isinstance(lbl, str):
-                lbl = LABEL_MAP.get(lbl.lower(), int(lbl))
+                lbl = LABEL_MAP[lbl.lower()]
             return image, int(lbl)
 
     print(f"[shared/data] Loading C-NMC 2019 ({cfg['hf_name']}) …")
