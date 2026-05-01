@@ -430,18 +430,9 @@ def _load_cnmc(
             return len(self.data)
 
         def __getitem__(self, idx):
-            import io as _io
             item  = self.data[idx]
             image = item[self.img_col]
-            if isinstance(image, dict):
-                # HuggingFace Parquet format: {'bytes': b'...', 'path': '...'}
-                if image.get("bytes"):
-                    image = Image.open(_io.BytesIO(image["bytes"]))
-                elif image.get("path"):
-                    image = Image.open(image["path"])
-                else:
-                    raise ValueError(f"Cannot decode image dict with keys: {list(image.keys())}")
-            elif not isinstance(image, Image.Image):
+            if not isinstance(image, Image.Image):
                 image = Image.fromarray(image)
             image = image.convert("RGB")
             if self.transform:
@@ -452,7 +443,14 @@ def _load_cnmc(
             return image, int(lbl)
 
     print(f"[shared/data] Loading C-NMC 2019 ({cfg['hf_name']}) …")
+    from datasets import Image as _HFImage
     hf_full = _load(cfg["hf_name"], split="train", **kw)
+
+    # Cast image column so HuggingFace decodes bytes → PIL automatically
+    img_col = next((c for c in hf_full.column_names
+                    if c in ("image", "img")), None)
+    if img_col:
+        hf_full = hf_full.cast_column(img_col, _HFImage())
 
     # Only a train split exists — carve out val (10%) and test (20%) manually
     n_total = len(hf_full)
