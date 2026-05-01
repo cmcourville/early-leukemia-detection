@@ -430,9 +430,18 @@ def _load_cnmc(
             return len(self.data)
 
         def __getitem__(self, idx):
+            import io as _io
             item  = self.data[idx]
             image = item[self.img_col]
-            if not isinstance(image, Image.Image):
+            if isinstance(image, dict):
+                # HuggingFace Parquet format: {'bytes': b'...', 'path': '...'}
+                if image.get("bytes"):
+                    image = Image.open(_io.BytesIO(image["bytes"]))
+                elif image.get("path"):
+                    image = Image.open(image["path"])
+                else:
+                    raise ValueError(f"Cannot decode image dict with keys: {list(image.keys())}")
+            elif not isinstance(image, Image.Image):
                 image = Image.fromarray(image)
             image = image.convert("RGB")
             if self.transform:
