@@ -430,11 +430,23 @@ def _load_cnmc(
             return len(self.data)
 
         def __getitem__(self, idx):
+            import io as _io
             item  = self.data[idx]
             image = item[self.img_col]
-            if not isinstance(image, Image.Image):
-                image = Image.fromarray(image)
-            image = image.convert("RGB")
+            try:
+                if isinstance(image, dict):
+                    if image.get("bytes"):
+                        image = Image.open(_io.BytesIO(image["bytes"]))
+                    elif image.get("path"):
+                        image = Image.open(image["path"])
+                    else:
+                        raise ValueError("empty image dict")
+                elif not isinstance(image, Image.Image):
+                    image = Image.fromarray(image)
+                image = image.convert("RGB")
+            except Exception:
+                # Corrupt sample — return a neutral gray placeholder
+                image = Image.new("RGB", (IMAGE_SIZE, IMAGE_SIZE), (128, 128, 128))
             if self.transform:
                 image = self.transform(image)
             lbl = item[self.lbl_col]
@@ -443,14 +455,7 @@ def _load_cnmc(
             return image, int(lbl)
 
     print(f"[shared/data] Loading C-NMC 2019 ({cfg['hf_name']}) …")
-    from datasets import Image as _HFImage
     hf_full = _load(cfg["hf_name"], split="train", **kw)
-
-    # Cast image column so HuggingFace decodes bytes → PIL automatically
-    img_col = next((c for c in hf_full.column_names
-                    if c in ("image", "img")), None)
-    if img_col:
-        hf_full = hf_full.cast_column(img_col, _HFImage())
 
     # Only a train split exists — carve out val (10%) and test (20%) manually
     n_total = len(hf_full)
@@ -474,13 +479,15 @@ def _load_cnmc(
     print(f"[shared/data] C-NMC — train:{len(train_ds)}, val:{len(val_ds)}, "
           f"test:{len(test_ds)}, classes:{label_map}")
 
+    # num_workers=0: keep decoding in main process to avoid corrupt-image
+    # crashes propagating from worker processes.
     return (
         DataLoader(train_ds, batch_size=batch_size, shuffle=True,
-                   num_workers=num_workers, pin_memory=pin_memory, drop_last=False),
+                   num_workers=0, pin_memory=pin_memory, drop_last=False),
         DataLoader(val_ds,   batch_size=batch_size, shuffle=False,
-                   num_workers=num_workers, pin_memory=pin_memory),
+                   num_workers=0, pin_memory=pin_memory),
         DataLoader(test_ds,  batch_size=batch_size, shuffle=False,
-                   num_workers=num_workers, pin_memory=pin_memory),
+                   num_workers=0, pin_memory=pin_memory),
         label_map,
     )
 
