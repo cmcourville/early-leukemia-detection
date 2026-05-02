@@ -179,6 +179,13 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--seed",        type=int,   default=GLOBAL_SEED)
     parser.add_argument("--output_dir",  type=str,   default=RESULTS_ROOT,
                         help="Root directory for all result outputs.")
+    parser.add_argument("--data_root",   type=str,   default=None,
+                        help=(
+                            "Override base data directory used by --dataset all. "
+                            "Defaults to <project_root>/data/. "
+                            "Useful in Colab when data lives on Drive: "
+                            "--data_root /content/drive/MyDrive/.../CS534-Group6"
+                        ))
     return parser.parse_args()
 
 # Per-model pipeline steps
@@ -393,12 +400,14 @@ def main():
 
     # --dataset all → run sequentially over the three primary datasets
     if args.dataset == "all":
+        data_root = Path(args.data_root) if args.data_root else PROJECT_ROOT / "data"
         PRIMARY_DATASETS = [
-            ("raabin",   str(PROJECT_ROOT / "data" / "raabin")),
-            ("bccd",     None),
-            ("cytodata", str(PROJECT_ROOT / "data" / "cytodata")),
+            ("raabin", str(data_root / "raabin")),
+            ("cnmc",   str(data_root / "cnmc")),
+            ("bccd",   str(data_root / "bccd")),
         ]
-        print("\n[pipeline] --dataset all: running all three primary datasets sequentially.")
+        print("\n[pipeline] --dataset all: running raabin, cnmc, bccd sequentially.")
+        print(f"[pipeline] data_root: {data_root}")
         for ds_name, ds_dir in PRIMARY_DATASETS:
             print(f"\n{'#'*64}")
             print(f"#  DATASET: {ds_name.upper()}")
