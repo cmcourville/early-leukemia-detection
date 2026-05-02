@@ -173,6 +173,8 @@ early-leukemia-detection/
 │
 ├── run_all.py                        # Unified pipeline — trains, evaluates, and compares all models
 ├── prepare_raabin.py                 # One-time setup: splits data/raabin/ into train/val/test
+├── prepare_cnmc.py                   # One-time setup: organizes downloaded CNMC BMP files into train/val/test
+├── prepare_bccd.py                   # One-time setup: downloads BCCD from GitHub and crops bboxes
 │
 ├── data/                             # Local datasets (gitignored)
 │   ├── raabin/                       # Acevedo et al. 2020, 5-class WBC (run prepare_raabin.py first)
@@ -252,17 +254,21 @@ python prepare_raabin.py
 
 ---
 
-### BCCD (`--dataset bccd`) — Supplementary Benchmark
+### BCCD (`--dataset bccd --data_dir data/bccd`) — Supplementary Benchmark
 
-**Source:** HuggingFace [`keremberke/blood-cell-object-detection`](https://huggingface.co/datasets/keremberke/blood-cell-object-detection) — downloads automatically, no login required.
+**Source:** [Shenggan/BCCD_Dataset](https://github.com/Shenggan/BCCD_Dataset) on GitHub — auto-downloaded by the prepare script, no login required.
 
-**Details:** 364 microscopy images originally annotated for object detection (COCO/PASCAL VOC format). Each annotated bounding box is cropped to produce individual cell classification samples, yielding approximately 3,000+ samples total.
+**Setup (one-time):**
+```bash
+python prepare_bccd.py --data_dir data/bccd
+```
+The script downloads the repo (~30 MB), parses Pascal VOC XML annotations, crops each bounding box, and saves the crops in ImageFolder format. Takes under a minute.
+
+**Details:** 364 microscopy images with Platelet/RBC/WBC bounding-box annotations. Each crop becomes one classification sample (~3,700 crops total after splitting).
 
 - Classes: `Platelet`, `RBC`, `WBC`
 - Normalisation: ImageNet defaults — mean `[0.485, 0.456, 0.406]`, std `[0.229, 0.224, 0.225]`
-- Requires: `pip install "datasets>=2.18,<3"` (version 3.x breaks the BCCD loader script; 2.21.0 confirmed working)
-
-> **Current Phase 2 results are on this dataset.** BCCD is 3-class, smaller, and simpler than Raabin-WBC, but fully public and requires no setup.
+- Layout after prepare: `data/bccd/{train,val,test}/<classname>/`
 
 ---
 
@@ -281,39 +287,60 @@ python prepare_raabin.py
 
 ---
 
-### C-NMC 2019 (`--dataset cnmc`) — Binary Leukemia Detection
+### C-NMC 2019 (`--dataset cnmc --data_dir data/cnmc`) — Binary Leukemia Detection
 
-**Source:** HuggingFace [`dwb2023/cnmc-leukemia-2019`](https://huggingface.co/datasets/dwb2023/cnmc-leukemia-2019) — downloads automatically, no login required.
+**Source:** Kaggle [`avk256/cnmc-leukemia`](https://www.kaggle.com/datasets/avk256/cnmc-leukemia) — requires a free Kaggle account.
 
-**Details:** 10,661 single-cell images from 73 ALL patients and healthy donors. The only dataset with genuine leukemic blast cells from a clinical challenge (ISBI 2019, Tata Medical Center, Kolkata).
+**Setup (one-time):**
+```bash
+# 1. Install the Kaggle CLI and authenticate
+pip install kaggle
+# Place kaggle.json from kaggle.com/settings → API in ~/.kaggle/kaggle.json
+
+# 2. Download and unzip (~600 MB)
+kaggle datasets download -d avk256/cnmc-leukemia --path data/cnmc_raw --unzip
+
+# 3. Organize into ImageFolder format (70/10/20 split, seed=42)
+python prepare_cnmc.py --src_dir data/cnmc_raw --data_dir data/cnmc
+```
+
+**Details:** 10,661 single-cell BMP images from 73 ALL patients and healthy donors. The only dataset with genuine leukemic blast cells from a clinical challenge (ISBI 2019, Tata Medical Center, Kolkata). The HuggingFace mirror (`dwb2023/cnmc-leukemia-2019`) does not include full image data and cannot be used for streaming — local files are required.
 
 - Classes: `all` (Acute Lymphoblastic Leukemia blasts), `hem` (healthy cells)
-- Class imbalance: ~68% ALL / 32% HEM — monitor per-class sensitivity
+- Class imbalance: ~68% ALL / 32% HEM — monitor per-class sensitivity (recall on ALL is the key clinical metric)
 - Normalisation: ImageNet defaults — mean `[0.485, 0.456, 0.406]`, std `[0.229, 0.224, 0.225]`
-- Validation split is carved automatically from training data (stratified 20%, seed=42) since HuggingFace only ships train + test
+- Layout after prepare: `data/cnmc/{train,val,test}/{all,hem}/`
 
 ---
 
 ## Setup
 
 ```bash
-# Clone the repo
+# 1. Clone the repo
 git clone <repo-url>
 cd early-leukemia-detection
 
-# Install shared + BccT dependencies
+# 2. Install dependencies (includes CytoDiffusion SD VAE requirements)
 pip install -r shared/requirements.txt
 pip install -r models/bcct/requirements.txt
 
-# One-time: split the Raabin-WBC dataset (data/raabin/ must already be unzipped)
+# 3. Raabin-WBC — download PBC_dataset_normal_DIB.zip from Mendeley:
+#    https://data.mendeley.com/datasets/snkd93bnjr/1
+#    Unzip so that data/raabin/basophil/, data/raabin/eosinophil/, etc. exist, then:
 python prepare_raabin.py
 
-# When teammates finish their models:
-# pip install -r models/cytodiffusion/requirements.txt
-# pip install -r models/vitcnn_ensemble/requirements.txt
+# 4. BCCD — auto-downloads from GitHub (~30 MB):
+python prepare_bccd.py --data_dir data/bccd
+
+# 5. C-NMC 2019 — requires a free Kaggle account:
+#    a. Download kaggle.json from kaggle.com/settings → API → Create Token
+#    b. Place it at ~/.kaggle/kaggle.json  (Linux/Mac) or %USERPROFILE%\.kaggle\kaggle.json (Windows)
+pip install kaggle
+kaggle datasets download -d avk256/cnmc-leukemia --path data/cnmc_raw --unzip
+python prepare_cnmc.py --src_dir data/cnmc_raw --data_dir data/cnmc
 ```
 
-**Core dependencies:** `torch>=2.1`, `torchvision>=0.16`, `transformers>=4.38`, `datasets>=2.18,<3`, `scikit-learn>=1.3`, `matplotlib>=3.7`, `Pillow>=9.5`, `tqdm>=4.65`
+**Core dependencies:** `torch>=2.1`, `torchvision>=0.16`, `transformers>=4.38`, `datasets>=2.18,<3`, `diffusers>=0.27`, `accelerate>=0.27`, `safetensors>=0.4`, `scikit-learn>=1.3`, `matplotlib>=3.7`, `Pillow>=9.5`, `tqdm>=4.65`
 
 ---
 
@@ -321,20 +348,28 @@ python prepare_raabin.py
 
 All commands are run from the project root (`early-leukemia-detection/`).
 
-### ⚡ Priority Runs for Phase 3
+### Run all three datasets in one command
 
 ```bash
-# 1. Raabin-WBC 5-class — primary benchmark (prepare_raabin.py must be run first)
-python run_all.py --dataset raabin --data_dir data/raabin --mode full_pipeline
+# Trains + evaluates both models on raabin, cnmc, and bccd sequentially (~4 hrs on GPU)
+python run_all.py --models bcct cytodiffusion --dataset all --device cuda
 
-# 2. CytoData 10-class — clinically relevant (data already present)
+# On Colab/cloud with data on Drive, use --data_root to point at the Drive folder:
+python run_all.py --models bcct cytodiffusion --dataset all --data_root /path/to/data/root --device cuda
+```
+
+`--dataset all` expects the following folders inside the data root:
+- `raabin/` — prepared by `prepare_raabin.py`
+- `cnmc/` — prepared by `prepare_cnmc.py`
+- `bccd/` — prepared by `prepare_bccd.py`
+
+### Run a single dataset
+
+```bash
+python run_all.py --dataset raabin   --data_dir data/raabin --mode full_pipeline
+python run_all.py --dataset cnmc     --data_dir data/cnmc   --mode full_pipeline
+python run_all.py --dataset bccd     --data_dir data/bccd   --mode full_pipeline
 python run_all.py --dataset cytodata --data_dir data/cytodata --mode full_pipeline
-
-# 3. BCCD — already has Phase 2 results, re-run if needed
-python run_all.py --dataset bccd --mode full_pipeline
-
-# 4. C-NMC binary leukemia detection (public, no setup)
-python run_all.py --dataset cnmc --mode full_pipeline
 ```
 
 ---
@@ -370,7 +405,8 @@ python run_all.py --dataset raabin --data_dir data/raabin --batch_size 64 --num_
 | `--mode` | `full_pipeline` | `train`, `evaluate`, `low_data`, or `full_pipeline` |
 | `--models` | all active | Space-separated model keys, e.g. `bcct` |
 | `--dataset` | `raabin` | `raabin`, `bccd`, `cytodata`, or `cnmc` |
-| `--data_dir` | `None` | Local dataset root — **required for `raabin` and `cytodata`** |
+| `--data_dir` | `None` | Local dataset root — **required for `raabin`, `cnmc`, `bccd`, and `cytodata`** |
+| `--data_root` | `data/` | Base directory used by `--dataset all` (overrides default `<project>/data/`) |
 | `--batch_size` | `32` | DataLoader batch size |
 | `--num_workers` | `4` | DataLoader worker processes |
 | `--device` | auto | `cuda`, `mps`, or `cpu` |
