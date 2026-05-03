@@ -76,11 +76,16 @@ def compute_all_metrics(
     f1_per_class = f1_score(y_true, y_pred, average=None, zero_division=0).tolist()
 
     # AUROC
+    # AUROC — binary case needs special handling (sklearn quirk)
     try:
-        auroc_macro     = float(roc_auc_score(y_true, y_prob, average="macro",
-                                               multi_class="ovr"))
-        auroc_per_class = roc_auc_score(y_true, y_prob, average=None,
-                                         multi_class="ovr").tolist()
+        if C == 2:
+            auroc_macro     = float(roc_auc_score(y_true, y_prob[:, 1]))
+            auroc_per_class = [auroc_macro, auroc_macro]
+        else:
+            auroc_macro     = float(roc_auc_score(y_true, y_prob, average="macro",
+                                                   multi_class="ovr"))
+            auroc_per_class = roc_auc_score(y_true, y_prob, average=None,
+                                             multi_class="ovr").tolist()
     except ValueError as e:
         print(f"[metrics] AUROC warning: {e}")
         auroc_macro     = float("nan")
@@ -261,8 +266,12 @@ def save_auroc_plot(
     from sklearn.metrics import roc_curve
     from sklearn.preprocessing import label_binarize
 
-    C     = len(class_names)
-    y_bin = label_binarize(y_true, classes=list(range(C)))
+    C = len(class_names)
+    # label_binarize returns (N,1) for binary — expand to (N,2) manually
+    if C == 2:
+        y_bin = np.column_stack([1 - y_true.astype(float), y_true.astype(float)])
+    else:
+        y_bin = label_binarize(y_true, classes=list(range(C)))
     fig, ax = plt.subplots(figsize=(8, 6))
     colors  = plt.cm.tab10(np.linspace(0, 1, C))
 
