@@ -54,7 +54,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "shared"))
 sys.path.insert(0, str(PROJECT_ROOT / "models" / "bcct"))
 sys.path.insert(0, str(PROJECT_ROOT / "models"))                        # cytodiffusion + vitcnn_ensemble
-# sys.path.insert(0, str(PROJECT_ROOT / "models" / "vitcnn_ensemble")) # UNCOMMENT WHEN READY
+sys.path.insert(0, str(PROJECT_ROOT / "models" / "vitcnn_ensemble")) # UNCOMMENT WHEN READY
 
 from shared.config import (
     LOW_DATA_SHOTS, LOW_DATA_REPEATS,
@@ -75,9 +75,9 @@ from token_fusion import reset_token_sizes
 # CytoDiffusion (Darshan)
 from cytodiffusion.model import CytoDiffusionModel
 
-# ViT-CNN Ensemble (Sean) — NOT YET IMPLEMENTED
+# ViT-CNN Ensemble (Sean) — Active
 # UNCOMMENT WHEN READY:
-# from vitcnn_ensemble.model import ViTCNNEnsemble
+from vitcnn_ensemble.model import ViTCNNEnsemble
 
 # Model registry
 # Each entry describes how to construct, train, and checkpoint a model.
@@ -110,16 +110,16 @@ MODEL_REGISTRY = {
     },
 
     # ViT-CNN Ensemble (Sean) — UNCOMMENT WHEN READY
-    # "vitcnn_ensemble": {
-    #     "name":        "ViT-CNN Ensemble (Sean)",
-    #     "active":      True,
-    #     "constructor": lambda num_classes, **kw: ViTCNNEnsemble(
-    #         num_classes=num_classes,
-    #     ),
-    #     "checkpoint_path": "models/vitcnn_ensemble/checkpoints/vitcnn_ensemble_model.pt",
-    #     "save_fn":  lambda model, path: model.save(path),
-    #     "load_fn":  lambda path, device: ViTCNNEnsemble.load(path, device),
-    # },
+     "vitcnn_ensemble": {
+         "name":        "ViT-CNN Ensemble (Sean)",
+         "active":      True,
+         "constructor": lambda num_classes, **kw: ViTCNNEnsemble(
+             num_classes=num_classes,
+         ),
+         "checkpoint_path": "models/vitcnn_ensemble/checkpoints/vitcnn_ensemble_model.pt",
+         "save_fn":  lambda model, path: model.save(path),
+         "load_fn":  lambda path, device: ViTCNNEnsemble.load(path, device),
+    },
 }
 
 # Argument parsing

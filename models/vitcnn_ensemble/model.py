@@ -141,8 +141,3 @@ class ViTCNNEnsemble(nn.Module):
 
         return model
 
-
-raise NotImplementedError(
-    "ViT-CNN Ensemble model not yet implemented. "
-    "Sean: please implement this module."
-)
