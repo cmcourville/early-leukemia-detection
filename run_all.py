@@ -36,6 +36,7 @@ Outputs (written to shared/results/):
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
 import sys
@@ -53,8 +54,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "shared"))
 sys.path.insert(0, str(PROJECT_ROOT / "models" / "bcct"))
-sys.path.insert(0, str(PROJECT_ROOT / "models"))                        # cytodiffusion + vitcnn_ensemble
-sys.path.insert(0, str(PROJECT_ROOT / "models" / "vitcnn_ensemble")) # UNCOMMENT WHEN READY
+sys.path.insert(0, str(PROJECT_ROOT / "models"))          # cytodiffusion + vitcnn_ensemble
+sys.path.insert(0, str(PROJECT_ROOT / "models" / "vitcnn_ensemble")) # Active
 
 from shared.config import (
     LOW_DATA_SHOTS, LOW_DATA_REPEATS,
@@ -75,7 +76,7 @@ from token_fusion import reset_token_sizes
 # CytoDiffusion (Darshan)
 from cytodiffusion.model import CytoDiffusionModel
 
-# ViT-CNN Ensemble (Sean) — Active
+# ViT-CNN Ensemble (Sean) — NOT YET IMPLEMENTED
 # UNCOMMENT WHEN READY:
 from vitcnn_ensemble.model import ViTCNNEnsemble
 
@@ -103,24 +104,27 @@ MODEL_REGISTRY = {
         "active":      True,
         "constructor": lambda num_classes, **kw: CytoDiffusionModel(
             num_classes=num_classes,
+            cache_dir=kw.get("cache_dir"),
+            img_mean=kw.get("img_mean"),
+            img_std=kw.get("img_std"),
         ),
         "checkpoint_path": "models/cytodiffusion/checkpoints/cytodiffusion_model.pt",
         "save_fn":  lambda model, path: model.save(path),
         "load_fn":  lambda path, device: CytoDiffusionModel.load(path, device),
     },
 
-    # ViT-CNN Ensemble (Sean) — UNCOMMENT WHEN READY
+     #ViT-CNN Ensemble (Sean) — UNCOMMENT WHEN READY
      "vitcnn_ensemble": {
          "name":        "ViT-CNN Ensemble (Sean)",
          "active":      True,
          "constructor": lambda num_classes, **kw: ViTCNNEnsemble(
              num_classes=num_classes,
-             cnn_logits=True
+             cnn_logits=True,
          ),
          "checkpoint_path": "models/vitcnn_ensemble/checkpoints/vitcnn_ensemble_model.pt",
          "save_fn":  lambda model, path: model.save(path),
          "load_fn":  lambda path, device: ViTCNNEnsemble.load(path, device),
-    },
+     },
 }
 
 # Argument parsing
@@ -176,6 +180,13 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--seed",        type=int,   default=GLOBAL_SEED)
     parser.add_argument("--output_dir",  type=str,   default=RESULTS_ROOT,
                         help="Root directory for all result outputs.")
+    parser.add_argument("--data_root",   type=str,   default=None,
+                        help=(
+                            "Override base data directory used by --dataset all. "
+                            "Defaults to <project_root>/data/. "
+                            "Useful in Colab when data lives on Drive: "
+                            "--data_root /content/drive/MyDrive/.../CS534-Group6"
+                        ))
     return parser.parse_args()
 
 # Per-model pipeline steps
@@ -210,6 +221,7 @@ def run_train(
     args:      argparse.Namespace,
     device:    torch.device,
     train_loader,
+    val_loader,
     label_map: Dict,
 ) -> object:
     """Train a single model and return the trained model instance."""
@@ -220,8 +232,13 @@ def run_train(
     num_classes = DATASET_CONFIGS[args.dataset]["num_classes"]
     model = entry["constructor"](num_classes=num_classes)
     model.to(device)
+
     t0 = time.time()
-    model.train_model(train_loader, device=device)
+    sig = inspect.signature(model.train_model)
+    if "val_loader" in sig.parameters:
+        model.train_model(train_loader, device=device, val_loader=val_loader)
+    else:
+        model.train_model(train_loader, device=device)
     elapsed = time.time() - t0
     print(f"[pipeline] Training complete in {elapsed:.1f}s")
 
@@ -379,12 +396,14 @@ def main():
 
     # --dataset all → run sequentially over the three primary datasets
     if args.dataset == "all":
+        data_root = Path(args.data_root) if args.data_root else PROJECT_ROOT / "data"
         PRIMARY_DATASETS = [
-            ("raabin",   str(PROJECT_ROOT / "data" / "raabin")),
-            ("bccd",     None),
-            ("cytodata", str(PROJECT_ROOT / "data" / "cytodata")),
+            ("raabin", str(data_root / "raabin")),
+            ("cnmc",   str(data_root / "cnmc")),
+            ("bccd",   str(data_root / "bccd")),
         ]
-        print("\n[pipeline] --dataset all: running all three primary datasets sequentially.")
+        print("\n[pipeline] --dataset all: running raabin, cnmc, bccd sequentially.")
+        print(f"[pipeline] data_root: {data_root}")
         for ds_name, ds_dir in PRIMARY_DATASETS:
             print(f"\n{'#'*64}")
             print(f"#  DATASET: {ds_name.upper()}")
@@ -451,6 +470,7 @@ def _run_single_dataset(args: argparse.Namespace, device: torch.device) -> None:
                     args=args,
                     device=device,
                     train_loader=train_loader,
+                    val_loader=val_loader,
                     label_map=label_map,
                 )
                 model_cache[model_key] = model

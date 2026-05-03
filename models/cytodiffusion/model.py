@@ -71,6 +71,7 @@ class CytoDiffusionModel(nn.Module):
         lr_head:      float = 1e-3,
         lr_encoder:   float = 1e-5,
         weight_decay: float = 1e-4,
+        cache_dir:    Optional[str] = None,
     ):
         super().__init__()
 
@@ -92,6 +93,7 @@ class CytoDiffusionModel(nn.Module):
             lr_head=lr_head,
             lr_encoder=lr_encoder,
             weight_decay=weight_decay,
+            cache_dir=cache_dir,
         )
 
         # Per-dataset normalization buffers; used to convert the
@@ -108,7 +110,7 @@ class CytoDiffusionModel(nn.Module):
         # VAE encoder (pretrained SD weights)
         print(f"[CytoDiffusion] Loading VAE encoder from {sd_model_id} …")
         self.encoder: AutoencoderKL = AutoencoderKL.from_pretrained(
-            sd_model_id, subfolder=_SD_SUBFOLDER
+            sd_model_id, subfolder=_SD_SUBFOLDER, cache_dir=cache_dir
         )
         if freeze_encoder:
             for p in self.encoder.parameters():
@@ -197,7 +199,15 @@ class CytoDiffusionModel(nn.Module):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=epochs, eta_min=lr_head * 0.01
         )
-        criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+
+        # Compute class weights from training data to handle imbalance
+        label_counts = torch.zeros(self.config["num_classes"])
+        for _, lbls in train_loader:
+            for l in lbls:
+                label_counts[int(l)] += 1
+        total = label_counts.sum()
+        class_weights = (total / (self.config["num_classes"] * label_counts.clamp(min=1))).to(device)
+        criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.1)
 
         for epoch in range(1, epochs + 1):
             self.train()

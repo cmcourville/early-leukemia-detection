@@ -119,7 +119,7 @@ class ViTCNNEnsemble(nn.Module):
             training_accuracy += (logits.argmax(dim=1) == labels).sum().item()
             training_steps += images.size(0)
 
-            if (batch_idx + 1) % 50 == 0:
+            if (batch_idx + 1) % 10 == 0:
                 print(f"    batch {batch_idx + 1}/{len(train_loader)} " f"loss: {loss.item():.4f}  "
                       f"acc: {training_accuracy / training_steps:.4f}")
 
