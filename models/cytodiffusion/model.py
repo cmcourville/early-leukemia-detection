@@ -199,7 +199,15 @@ class CytoDiffusionModel(nn.Module):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=epochs, eta_min=lr_head * 0.01
         )
-        criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+
+        # Compute class weights from training data to handle imbalance
+        label_counts = torch.zeros(self.config["num_classes"])
+        for _, lbls in train_loader:
+            for l in lbls:
+                label_counts[int(l)] += 1
+        total = label_counts.sum()
+        class_weights = (total / (self.config["num_classes"] * label_counts.clamp(min=1))).to(device)
+        criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.1)
 
         for epoch in range(1, epochs + 1):
             self.train()

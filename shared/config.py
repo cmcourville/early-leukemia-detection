@@ -165,32 +165,28 @@ DATASET_CONFIGS = {
     # This is the only dataset in the pipeline with genuine leukemic blast cells,
     # making it the primary dataset for validating the clinical leukemia detection claim.
     #
-    # Split strategy: HuggingFace ships train + test only (no validation split).
-    # The loader automatically carves 20% of train as validation (stratified, seed=42).
+    # Split strategy: HuggingFace only ships a train split (no val/test).
+    # The loader automatically carves val (10%) and test (20%) from train, seed=42.
     "cnmc": {
         "display_name": "C-NMC 2019",
         "hf_name":      "dwb2023/cnmc-leukemia-2019",
         "num_classes":  2,
-        # Label 0 = ALL (leukemic blast cells), Label 1 = HEM (healthy/normal)
-        # These match the integer label order in the HuggingFace dataset.
-        "class_names":  ["all", "hem"],
-        "mean":         [0.485, 0.456, 0.406],  # ImageNet defaults — recompute if needed
+        "class_names":  ["HEM", "ALL"],   # 0=HEM (healthy), 1=ALL (cancer)
+        "mean":         [0.485, 0.456, 0.406],
         "std":          [0.229, 0.224, 0.225],
         "source":       "huggingface",
-        "task":         "binary_classification",  # leukemia (ALL) vs. healthy (HEM)
-        # HuggingFace ships train + test only; val is carved from train at load time.
-        "hf_splits":    {"train": "train", "val": None, "test": "test"},
-        "val_fraction": 0.20,   # fraction of train used as validation
+        "task":         "classification",
+        "hf_splits":    {"train": "train", "val": None, "test": None},
+        "val_fraction": 0.20,
         "notes": (
             "10,661 single-cell images from 73 ALL patients + healthy donors. "
             "Source: C-NMC 2019 ISBI Challenge / Tata Medical Center, Kolkata. "
-            "Classes: ALL (7,272 blast cells) vs. HEM (3,389 healthy cells). "
+            "Classes: HEM (healthy, class 0) vs ALL (cancer, class 1). "
             "Class imbalance ~68/32 — monitor per-class sensitivity during evaluation. "
             "HuggingFace: dwb2023/cnmc-leukemia-2019 (fully public, no login required). "
             "Run with: python run_all.py --dataset cnmc"
         ),
     },
-
 }
 
 # Convenience: valid dataset keys

@@ -36,7 +36,7 @@ from cytodiffusion.model import CytoDiffusionModel
 def get_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Train CytoDiffusionModel.")
     p.add_argument("--dataset",     type=str,   default="raabin",
-                   choices=["raabin", "bccd", "cytodata"])
+                   choices=["raabin", "bccd", "cytodata", "cnmc"])
     p.add_argument("--data_dir",    type=str,   default=None,
                    help="Local root for CytoData (ImageFolder layout).")
     p.add_argument("--batch_size",  type=int,   default=32)
