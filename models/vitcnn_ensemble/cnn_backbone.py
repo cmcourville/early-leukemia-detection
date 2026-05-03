@@ -1,4 +1,5 @@
-from torch import nn, Tensor
+import torch
+from torch import nn
 from torchvision.models.inception import inception_v3, Inception_V3_Weights
 
 class InceptionNetV3Backbone(nn.Module):
@@ -19,11 +20,11 @@ class InceptionNetV3Backbone(nn.Module):
         "Mixed_7a", "Mixed_7b", "Mixed_7c",
     ]
 
-    def __init__(self, frozen_layer_index: str = "Mixed_6e"):
+    def __init__(self, frozen_layer_index: str = "Mixed_6e", logits_setting:bool = False):
         super().__init__()
         # "False" deactivates the auxiliary classifier which is not needed since we will be feeding the input to ViT
         # Weights argument set to default is what is allowing the use of the pretrained model.
-        v3BackBone = inception_v3(aux_logits=False, weights=Inception_V3_Weights.DEFAULT)
+        v3BackBone = inception_v3(aux_logits=logits_setting, weights=Inception_V3_Weights.DEFAULT)
 
         self.features = nn.Sequential(
             v3BackBone.Conv2d_1a_3x3,
@@ -57,13 +58,17 @@ class InceptionNetV3Backbone(nn.Module):
         """
         if frozen_layer_index is None:
             return
-        layer_name_to_index = self.LAYER_NAMES[frozen_layer_index]
+        if frozen_layer_index not in self.LAYER_NAMES:
+            choices = " ,".join(self.LAYER_NAMES)
+            raise ValueError(f"Invalid frozen layer index: {frozen_layer_index}, "
+                             f"valid options are: {choices}")
+        layer_index = self.LAYER_NAMES.index(frozen_layer_index)
         for index, layer in enumerate(self.features):
-            if index <= layer_name_to_index:
+            if index <= layer_index:
                 for param in layer.parameters():
                     param.requires_grad = False
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         features = self.features(x)
         batch, channels, height, width = x.shape
         tokens = features.flatten(2).transpose(1, 2)

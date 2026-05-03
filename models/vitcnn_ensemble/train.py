@@ -107,7 +107,7 @@ def main() -> None:
     model = ViTCNNEnsemble(
         num_classes= num_classes
     )
-
+    model.to(device)
     model.train_model(train_loader, val_loader, test_loader)
 
     out_dir = (

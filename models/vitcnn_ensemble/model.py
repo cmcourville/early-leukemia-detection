@@ -64,7 +64,8 @@ class ViTCNNEnsemble(nn.Module):
                  num_heads: int = 8,
                  dropout_rate: float = 0.2,
                  feedforward_dimension: int = 256,
-                 freeze_layer_index: str = "Mixed_6e"):
+                 freeze_layer_index: str = "Mixed_6e",
+                 cnn_logits: bool = False):
         super().__init__()
         """
         Common Datastructure used for storing the model state helpful for load and save
@@ -78,7 +79,7 @@ class ViTCNNEnsemble(nn.Module):
             "freeze_layer_index": freeze_layer_index
         }
 
-        self.backbone = InceptionNetV3Backbone(frozen_layer_index=freeze_layer_index)
+        self.backbone = InceptionNetV3Backbone(logits_setting=cnn_logits, frozen_layer_index=freeze_layer_index)
         self.vit = ViT(input_dimension=2048,  # fixed value as this is the output size of inceptionNetV3
                        num_heads=num_heads,
                        embedding_dimension=embedding_dimension,

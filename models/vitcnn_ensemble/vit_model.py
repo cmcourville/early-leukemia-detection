@@ -14,7 +14,7 @@ class VitMultiAttentionHead(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch, seq, dimension = x.shape
-        query_key_value = self.query_key_value(x).reshape(batch, seq, self.num_heads, self.head_dim)
+        query_key_value = self.query_key_value(x).reshape(batch, seq, 3, self.num_heads, self.head_dim)
         # Reordering the Matrix such that, the 3 segments are the first Dim
         # Batch is the second dim, Number of heads is the third dim, Sequence is the foruth dim, and head dim is last
         query_key_value = query_key_value.permute(2, 0, 3, 1, 4)
@@ -35,7 +35,7 @@ class TransformerBlock(nn.Module):
         self.norm1 = nn.LayerNorm(embedding_dimension)
         self.multi_attention_head = VitMultiAttentionHead(embedding_dimension, num_heads, dropout_rate)
         self.norm2 = nn.LayerNorm(embedding_dimension)
-        self.feed_forward_nework = nn.Sequential(
+        self.feed_forward_network = nn.Sequential(
             nn.Linear(embedding_dimension, feedforward_dimension),
             nn.GELU(),
             nn.Linear(feedforward_dimension, embedding_dimension),
@@ -74,7 +74,7 @@ class ViT(nn.Module):
         x = self.input_projection(x)
         cls_token = self.cls_token.expand(batch, -1, -1)
         x = torch.cat([cls_token, x], dim=1)
-        x = x + self.positional_embedding[:, : x.shape[1], :]
+        x = x + self.pos_embedded[:, : x.shape[1], :]
         x = self.positional_dropout(x)
         x = self.blocks(x)
         x = self.normalize(x)

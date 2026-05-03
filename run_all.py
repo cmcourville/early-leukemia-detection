@@ -115,6 +115,7 @@ MODEL_REGISTRY = {
          "active":      True,
          "constructor": lambda num_classes, **kw: ViTCNNEnsemble(
              num_classes=num_classes,
+             cnn_logits=True
          ),
          "checkpoint_path": "models/vitcnn_ensemble/checkpoints/vitcnn_ensemble_model.pt",
          "save_fn":  lambda model, path: model.save(path),
@@ -218,7 +219,7 @@ def run_train(
 
     num_classes = DATASET_CONFIGS[args.dataset]["num_classes"]
     model = entry["constructor"](num_classes=num_classes)
-
+    model.to(device)
     t0 = time.time()
     model.train_model(train_loader, device=device)
     elapsed = time.time() - t0
