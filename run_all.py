@@ -36,6 +36,7 @@ Outputs (written to shared/results/):
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
 import sys
@@ -57,7 +58,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "models"))                        # cytodi
 # sys.path.insert(0, str(PROJECT_ROOT / "models" / "vitcnn_ensemble")) # UNCOMMENT WHEN READY
 
 from shared.config import (
-    NUM_CLASSES, MODEL_NAMES, LOW_DATA_SHOTS, LOW_DATA_REPEATS,
+    LOW_DATA_SHOTS, LOW_DATA_REPEATS,
     GLOBAL_SEED, RESULTS_ROOT, DATASET_CONFIGS,
 )
 from shared.data.data_loader import get_dataloaders, get_few_shot_loaders
@@ -103,6 +104,9 @@ MODEL_REGISTRY = {
         "active":      True,
         "constructor": lambda num_classes, **kw: CytoDiffusionModel(
             num_classes=num_classes,
+            cache_dir=kw.get("cache_dir"),
+            img_mean=kw.get("img_mean"),
+            img_std=kw.get("img_std"),
         ),
         "checkpoint_path": "models/cytodiffusion/checkpoints/cytodiffusion_model.pt",
         "save_fn":  lambda model, path: model.save(path),
@@ -144,17 +148,28 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--dataset", type=str, default="raabin",
-        choices=["raabin", "bccd", "cytodata"],
-        help="Dataset to use for all models (default: raabin).",
+        choices=["raabin", "bccd", "cytodata", "cnmc", "all"],
+        help=(
+            "Dataset to use for all models (default: raabin). "
+            "Pass 'all' to run sequentially over raabin, cnmc, and cytodata."
+        ),
     )
     parser.add_argument(
         "--data_dir", type=str, default=None,
-        help="Local dataset root — required when --dataset cytodata.",
+        help=(
+            "Local dataset root — required when --dataset cytodata. "
+            "Default for 'all' mode: data/cytodata (relative to project root)."
+        ),
     )
     parser.add_argument("--batch_size",  type=int,   default=32)
     parser.add_argument("--num_workers", type=int,   default=4)
     parser.add_argument("--cache_dir",   type=str,   default=None,
                         help="HuggingFace cache directory.")
+    parser.add_argument("--hf_token",    type=str,   default=None,
+                        help=(
+                            "HuggingFace API token for gated datasets (e.g. Raabin-WBC). "
+                            "If omitted, the cached token from `huggingface-cli login` is used."
+                        ))
     parser.add_argument("--device",      type=str,   default=None,
                         help="Compute device (auto-detected if omitted).")
     parser.add_argument("--shots",       type=int,   nargs="+",
@@ -164,6 +179,13 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--seed",        type=int,   default=GLOBAL_SEED)
     parser.add_argument("--output_dir",  type=str,   default=RESULTS_ROOT,
                         help="Root directory for all result outputs.")
+    parser.add_argument("--data_root",   type=str,   default=None,
+                        help=(
+                            "Override base data directory used by --dataset all. "
+                            "Defaults to <project_root>/data/. "
+                            "Useful in Colab when data lives on Drive: "
+                            "--data_root /content/drive/MyDrive/.../CS534-Group6"
+                        ))
     return parser.parse_args()
 
 # Per-model pipeline steps
@@ -198,6 +220,7 @@ def run_train(
     args:      argparse.Namespace,
     device:    torch.device,
     train_loader,
+    val_loader,
     label_map: Dict,
 ) -> object:
     """Train a single model and return the trained model instance."""
@@ -205,11 +228,21 @@ def run_train(
     print(f"  TRAINING: {entry['name']}")
     print(f"{'='*64}")
 
-    num_classes = DATASET_CONFIGS[args.dataset]["num_classes"]
-    model = entry["constructor"](num_classes=num_classes)
+    ds_cfg = DATASET_CONFIGS[args.dataset]
+    num_classes = ds_cfg["num_classes"]
+    model = entry["constructor"](
+        num_classes=num_classes,
+        cache_dir=args.cache_dir,
+        img_mean=ds_cfg["mean"],
+        img_std=ds_cfg["std"],
+    )
 
     t0 = time.time()
-    model.train_model(train_loader, device=device)
+    sig = inspect.signature(model.train_model)
+    if "val_loader" in sig.parameters:
+        model.train_model(train_loader, device=device, val_loader=val_loader)
+    else:
+        model.train_model(train_loader, device=device)
     elapsed = time.time() - t0
     print(f"[pipeline] Training complete in {elapsed:.1f}s")
 
@@ -279,6 +312,7 @@ def run_low_data(
     num_workers: int,
     dataset:     str = "raabin",
     data_dir:    Optional[str] = None,
+    hf_token:    Optional[str] = None,
 ) -> Dict:
     """Run n-shot experiments for a single model."""
     summary = {}
@@ -300,6 +334,7 @@ def run_low_data(
                 num_workers=num_workers,
                 cache_dir=cache_dir,
                 seed=rep_seed,
+                hf_token=hf_token,
             )
 
             # Re-collect CLS features and re-fit FRC (BccT-specific)
@@ -363,6 +398,32 @@ def main():
     print(f"  Device : {device}")
     print("=" * 64)
 
+    # --dataset all → run sequentially over the three primary datasets
+    if args.dataset == "all":
+        data_root = Path(args.data_root) if args.data_root else PROJECT_ROOT / "data"
+        PRIMARY_DATASETS = [
+            ("raabin", str(data_root / "raabin")),
+            ("cnmc",   str(data_root / "cnmc")),
+            ("bccd",   str(data_root / "bccd")),
+        ]
+        print("\n[pipeline] --dataset all: running raabin, cnmc, bccd sequentially.")
+        print(f"[pipeline] data_root: {data_root}")
+        for ds_name, ds_dir in PRIMARY_DATASETS:
+            print(f"\n{'#'*64}")
+            print(f"#  DATASET: {ds_name.upper()}")
+            print(f"{'#'*64}")
+            args.dataset  = ds_name
+            args.data_dir = ds_dir
+            # Recurse into the single-dataset path with updated args
+            _run_single_dataset(args, device)
+        print("\n[pipeline] All datasets complete.")
+        return
+
+    _run_single_dataset(args, device)
+
+
+def _run_single_dataset(args: argparse.Namespace, device: torch.device) -> None:
+    """Run the full pipeline for a single dataset (extracted so --dataset all can loop)."""
     # Determine which models to run
     requested = set(args.models) if args.models else None
     active_models = {
@@ -373,7 +434,7 @@ def main():
     if not active_models:
         print("[pipeline] No active models to run.  "
               "Check MODEL_REGISTRY or --models argument.")
-        sys.exit(0)
+        return
 
     print(f"\n[pipeline] Models to run: {[v['name'] for v in active_models.values()]}")
 
@@ -386,9 +447,13 @@ def main():
         num_workers=args.num_workers,
         cache_dir=args.cache_dir,
         pin_memory=(device.type == "cuda"),
+        hf_token=getattr(args, "hf_token", None),
     )
-    class_names = [label_map[i] for i in range(NUM_CLASSES)]
-    out_root    = PROJECT_ROOT / args.output_dir
+    class_names = [label_map[i] for i in sorted(label_map.keys())]
+
+    # Results go into a dataset-specific subdirectory so runs don't overwrite each other
+    # e.g. shared/results/raabin/bcct/  or  shared/results/cnmc/bcct/
+    out_root = PROJECT_ROOT / args.output_dir / args.dataset
 
     all_test_metrics: Dict[str, Dict] = {}
     model_cache: Dict[str, object]    = {}
@@ -409,6 +474,7 @@ def main():
                     args=args,
                     device=device,
                     train_loader=train_loader,
+                    val_loader=val_loader,
                     label_map=label_map,
                 )
                 model_cache[model_key] = model
@@ -460,6 +526,7 @@ def main():
                     cache_dir=args.cache_dir, batch_size=args.batch_size,
                     num_workers=args.num_workers,
                     dataset=args.dataset, data_dir=args.data_dir,
+                    hf_token=getattr(args, "hf_token", None),
                 )
 
         except Exception as exc:
@@ -472,7 +539,7 @@ def main():
     if all_test_metrics and len(all_test_metrics) > 0:
         table = format_comparison_table(all_test_metrics)
         print("\n" + "=" * 64)
-        print("  Cross-Model Comparison (Test Set)")
+        print(f"  Cross-Model Comparison — {args.dataset.upper()} (Test Set)")
         print("=" * 64)
         print(table)
 
@@ -480,8 +547,8 @@ def main():
         table_path.write_text(table)
         print(f"\n[pipeline] Comparison table saved → {table_path}")
 
-    print("\n[pipeline] Pipeline complete.")
-    print(f"[pipeline] All results written to: {out_root.resolve()}")
+    print(f"\n[pipeline] {args.dataset.upper()} complete.")
+    print(f"[pipeline] Results written to: {out_root.resolve()}")
 
 if __name__ == "__main__":
     main()

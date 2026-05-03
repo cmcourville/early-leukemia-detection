@@ -60,6 +60,7 @@ def get_dataloaders(
     num_workers: int = 4,
     cache_dir:   Optional[str] = None,
     pin_memory:  bool = True,
+    hf_token:    Optional[str] = None,
 ) -> Tuple[DataLoader, DataLoader, DataLoader, Dict[int, str]]:
     """
     Return (train_loader, val_loader, test_loader, label_map) for BccT.
@@ -72,6 +73,7 @@ def get_dataloaders(
         num_workers : DataLoader worker count.
         cache_dir   : HuggingFace cache directory (raabin / bccd only).
         pin_memory  : Enable pinned memory for faster GPU transfers.
+        hf_token    : HuggingFace API token for gated datasets (raabin).
     """
     return _get_dataloaders(
         dataset=dataset,
@@ -80,6 +82,7 @@ def get_dataloaders(
         num_workers=num_workers,
         cache_dir=cache_dir,
         pin_memory=pin_memory,
+        hf_token=hf_token,
     )
 
 
@@ -91,6 +94,7 @@ def get_few_shot_loaders(
     num_workers: int = 4,
     cache_dir:   Optional[str] = None,
     seed:        int = GLOBAL_SEED,
+    hf_token:    Optional[str] = None,
 ) -> Tuple[DataLoader, DataLoader, DataLoader, Dict[int, str]]:
     """
     Build an n-shot training loader (stratified, n samples per class).
@@ -100,6 +104,7 @@ def get_few_shot_loaders(
         n_shot   : Training examples per class (e.g. 10, 20, 50).
         dataset  : "raabin", "bccd", or "cytodata".
         seed     : Random seed — use the same seed across models for fair comparison.
+        hf_token : HuggingFace API token for gated datasets (raabin).
     """
     return _get_few_shot_loaders(
         n_shot=n_shot,
@@ -109,6 +114,7 @@ def get_few_shot_loaders(
         num_workers=num_workers,
         cache_dir=cache_dir,
         seed=seed,
+        hf_token=hf_token,
     )
 
 
@@ -116,7 +122,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="BccT data loader sanity check")
     parser.add_argument("--dataset",  default="raabin",
-                        choices=["raabin", "bccd", "cytodata"])
+                        choices=["raabin", "bccd", "cytodata", "cnmc"])
     parser.add_argument("--data_dir", default=None,
                         help="Local path for CytoData")
     parser.add_argument("--batch_size", type=int, default=8)

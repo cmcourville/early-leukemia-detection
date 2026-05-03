@@ -34,7 +34,7 @@ import torch
 def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--dataset", type=str, default="raabin",
-        choices=["raabin", "bccd", "cytodata"],
+        choices=["raabin", "bccd", "cytodata", "cnmc"],
         help="Dataset to use: 'raabin' (default), 'bccd', or 'cytodata'."
     )
     parser.add_argument(
@@ -78,6 +78,13 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
         "--seed", type=int, default=42,
         help="Global random seed."
     )
+    parser.add_argument(
+        "--hf_token", type=str, default=None,
+        help=(
+            "HuggingFace API token for gated datasets (e.g. Raabin-WBC). "
+            "If omitted, the cached token from `huggingface-cli login` is used."
+        ),
+    )
 
 # Mode: train
 
@@ -112,9 +119,12 @@ def mode_evaluate(args: argparse.Namespace) -> None:
     model = BccTModel.load(args.checkpoint, device=device)
 
     train_dl, val_dl, test_dl, label_map = get_dataloaders(
+        dataset=getattr(args, "dataset", "raabin"),
+        data_dir=getattr(args, "data_dir", None),
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         cache_dir=args.cache_dir,
+        hf_token=getattr(args, "hf_token", None),
     )
 
     results_dir = Path(args.output_dir) / "eval"
@@ -271,9 +281,12 @@ def mode_full_pipeline(args: argparse.Namespace) -> None:
     # Step 2: Evaluate val + test
     print("\n[Pipeline] Step 2: Evaluation …")
     train_dl, val_dl, test_dl, label_map = get_dataloaders(
+        dataset=getattr(args, "dataset", "raabin"),
+        data_dir=getattr(args, "data_dir", None),
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         cache_dir=args.cache_dir,
+        hf_token=getattr(args, "hf_token", None),
     )
     for loader, split_name in [(val_dl, "Validation"), (test_dl, "Test")]:
         evaluate_model(

@@ -75,16 +75,16 @@ def compute_all_metrics(
     f1_macro     = float(f1_score(y_true, y_pred, average="macro",  zero_division=0))
     f1_per_class = f1_score(y_true, y_pred, average=None, zero_division=0).tolist()
 
-    # AUROC
-    # AUROC — binary case needs special handling (sklearn quirk)
+    # AUROC — binary needs special handling (multi_class="ovr" requires C>=3)
+    y_true_1d = np.array(y_true).ravel()
     try:
         if C == 2:
-            auroc_macro     = float(roc_auc_score(y_true, y_prob[:, 1]))
+            auroc_macro = float(roc_auc_score(y_true_1d, y_prob[:, 1]))
             auroc_per_class = [auroc_macro, auroc_macro]
         else:
-            auroc_macro     = float(roc_auc_score(y_true, y_prob, average="macro",
+            auroc_macro     = float(roc_auc_score(y_true_1d, y_prob, average="macro",
                                                    multi_class="ovr"))
-            auroc_per_class = roc_auc_score(y_true, y_prob, average=None,
+            auroc_per_class = roc_auc_score(y_true_1d, y_prob, average=None,
                                              multi_class="ovr").tolist()
     except ValueError as e:
         print(f"[metrics] AUROC warning: {e}")
@@ -92,7 +92,7 @@ def compute_all_metrics(
         auroc_per_class = [float("nan")] * C
 
     # Confusion matrix → sensitivity & specificity
-    cm = confusion_matrix(y_true, y_pred, labels=list(range(C)))
+    cm = confusion_matrix(y_true_1d, y_pred, labels=list(range(C)))
     sensitivity_per_class, specificity_per_class = [], []
 
     for c in range(C):
@@ -266,12 +266,11 @@ def save_auroc_plot(
     from sklearn.metrics import roc_curve
     from sklearn.preprocessing import label_binarize
 
-    C = len(class_names)
-    # label_binarize returns (N,1) for binary — expand to (N,2) manually
-    if C == 2:
-        y_bin = np.column_stack([1 - y_true.astype(float), y_true.astype(float)])
-    else:
-        y_bin = label_binarize(y_true, classes=list(range(C)))
+    C     = len(class_names)
+    y_bin = label_binarize(y_true, classes=list(range(C)))
+    # label_binarize returns (n,1) for binary — expand to (n,2) for uniform handling
+    if C == 2 and y_bin.shape[1] == 1:
+        y_bin = np.hstack([1 - y_bin, y_bin])
     fig, ax = plt.subplots(figsize=(8, 6))
     colors  = plt.cm.tab10(np.linspace(0, 1, C))
 
