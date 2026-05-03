@@ -22,6 +22,7 @@ Shared data loading:
 
 Suggested checkpoint save location: checkpoints/vitcnn_ensemble_model.pt
 """
+from shared.data.data_loader import get_dataloaders
 
 raise NotImplementedError(
     "ViT-CNN Ensemble training script not yet implemented. "
