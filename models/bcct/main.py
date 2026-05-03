@@ -34,7 +34,7 @@ import torch
 def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--dataset", type=str, default="raabin",
-        choices=["raabin", "bccd", "cytodata"],
+        choices=["raabin", "bccd", "cytodata", "cnmc"],
         help="Dataset to use: 'raabin' (default), 'bccd', or 'cytodata'."
     )
     parser.add_argument(

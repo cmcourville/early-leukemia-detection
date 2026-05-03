@@ -120,12 +120,28 @@ class HFImageDataset(Dataset):
     def __getitem__(self, idx):
         item  = self.data[idx]
         image = item[self.img_col]
-        if not isinstance(image, Image.Image):
+        if isinstance(image, dict):
+            import io
+            b = image.get("bytes")
+            p = image.get("path")
+            if b:
+                image = Image.open(io.BytesIO(b))
+            elif p:
+                image = Image.open(p)
+            else:
+                raise ValueError(f"Image dict has no bytes or path: {image}")
+        elif not isinstance(image, Image.Image):
             image = Image.fromarray(image)
         image = image.convert("RGB")
         if self.transform:
             image = self.transform(image)
-        return image, int(item[self.lbl_col])
+        label = item[self.lbl_col]
+        if isinstance(label, str):
+            if not hasattr(self, "_str_label_map"):
+                unique = sorted(set(self.data[self.lbl_col]))
+                self._str_label_map = {v: i for i, v in enumerate(unique)}
+            label = self._str_label_map[label]
+        return image, int(label)
 
     @property
     def class_names(self) -> List[str]:
@@ -358,11 +374,49 @@ def _load_bccd(
     num_workers: int,
     cache_dir:   Optional[str],
     pin_memory:  bool,
+    data_dir:    Optional[str] = None,
 ) -> Tuple[DataLoader, DataLoader, DataLoader, Dict[int, str]]:
-    """Load BCCD from HuggingFace, crop bounding boxes → classification samples."""
+    """Load BCCD.
+
+    Preferred path: local ImageFolder of pre-cropped cells (from prepare_bccd.py).
+    Fallback: HuggingFace keremberke/blood-cell-object-detection (may be unavailable).
+    """
+    cfg = DATASET_CONFIGS["bccd"]
+
+    if data_dir:
+        data_path = Path(data_dir)
+        missing = [s for s in ["train", "val", "test"] if not (data_path / s).is_dir()]
+        if missing:
+            raise FileNotFoundError(
+                "\n\n" + "="*64 + "\n"
+                f"  ERROR: Missing split folders in {data_dir}: {missing}\n"
+                "="*64 + "\n\n"
+                "  Run the prepare script first:\n"
+                "    python prepare_bccd.py\n"
+                + "="*64 + "\n"
+            )
+        print(f"[shared/data] Loading BCCD from local path: {data_dir}")
+        train_tf = get_train_transform(cfg["mean"], cfg["std"])
+        eval_tf  = get_eval_transform(cfg["mean"],  cfg["std"])
+        train_ds = LocalImageFolderDataset(data_dir, "train", cfg["class_names"], train_tf)
+        val_ds   = LocalImageFolderDataset(data_dir, "val",   cfg["class_names"], eval_tf)
+        test_ds  = LocalImageFolderDataset(data_dir, "test",  cfg["class_names"], eval_tf)
+        label_map = {i: n for i, n in enumerate(cfg["class_names"])}
+        print(f"[shared/data] BCCD — train:{len(train_ds)}, val:{len(val_ds)}, "
+              f"test:{len(test_ds)}, classes:{label_map}")
+        return (
+            DataLoader(train_ds, batch_size=batch_size, shuffle=True,
+                       num_workers=num_workers, pin_memory=pin_memory, drop_last=False),
+            DataLoader(val_ds,   batch_size=batch_size, shuffle=False,
+                       num_workers=num_workers, pin_memory=pin_memory),
+            DataLoader(test_ds,  batch_size=batch_size, shuffle=False,
+                       num_workers=num_workers, pin_memory=pin_memory),
+            label_map,
+        )
+
+    # HuggingFace fallback
     from datasets import load_dataset as _load
 
-    cfg = DATASET_CONFIGS["bccd"]
     kw  = {"cache_dir": cache_dir} if cache_dir else {}
 
     print(f"[shared/data] Loading BCCD ({cfg['hf_name']}) …")
@@ -378,15 +432,7 @@ def _load_bccd(
                 f"  ERROR: BCCD loader is incompatible with your `datasets` version\n"
                 f"  Current runtime rejected dataset script for: {cfg['hf_name']}\n"
                 f"{'='*64}\n\n"
-                f"  Cause:\n"
-                f"    You are using a newer HuggingFace `datasets` release that no longer\n"
-                f"    supports loading this dataset via its script.\n\n"
-                f"  Fix (recommended):\n"
-                f"    pip install \"datasets>=2.18,<3\"\n\n"
-                f"  Then verify:\n"
-                f"    python -c \"import datasets; print(datasets.__version__)\"\n\n"
-                f"  And rerun:\n"
-                f"    python run_all.py --models bcct --dataset bccd\n"
+                f"  Fix: python prepare_bccd.py  then pass --data_dir data/bccd\n"
                 f"{'='*64}\n"
             ) from exc
         raise
@@ -419,64 +465,63 @@ def _load_cnmc(
     cache_dir:   Optional[str],
     pin_memory:  bool,
     hf_token:    Optional[str] = None,
+    data_dir:    Optional[str] = None,
 ) -> Tuple[DataLoader, DataLoader, DataLoader, Dict[int, str]]:
+    """Load C-NMC 2019 — binary leukemia detection (ALL blast vs. HEM healthy).
+
+    Preferred path: local ImageFolder prepared by prepare_cnmc.py.
+    The HuggingFace dataset (dwb2023/cnmc-leukemia-2019) stores only BMP file
+    headers (~20 bytes) in the bytes field, so streaming from HF does not work.
     """
-    Load C-NMC 2019 (dwb2023/cnmc-leukemia-2019) from HuggingFace.
-
-    Binary leukemia detection: ALL blast cells (label 0) vs. HEM healthy cells (label 1).
-
-    The HuggingFace dataset ships train + test splits only — no validation split.
-    This function carves a stratified 20% validation set from the training split
-    using GLOBAL_SEED so results are reproducible.
-
-    Label mapping (as shipped by the HuggingFace dataset):
-        0 = all  (Acute Lymphoblastic Leukemia blast cells)
-        1 = hem  (healthy / normal cells)
-    """
-    from datasets import load_dataset as _load
-
     cfg = DATASET_CONFIGS["cnmc"]
-    kw  = {}
-    if cache_dir:
-        kw["cache_dir"] = cache_dir
-    if hf_token:
-        kw["token"] = hf_token
 
-    print(f"[shared/data] Loading C-NMC 2019 ({cfg['hf_name']}) …")
-    hf_train_full = _load(cfg["hf_name"], split="train", **kw)
-    hf_test       = _load(cfg["hf_name"], split="test",  **kw)
+    if data_dir:
+        data_path = Path(data_dir)
+        missing = [s for s in ["train", "val", "test"] if not (data_path / s).is_dir()]
+        if missing:
+            raise FileNotFoundError(
+                "\n\n" + "="*64 + "\n"
+                f"  ERROR: Missing split folders in {data_dir}: {missing}\n"
+                "="*64 + "\n\n"
+                "  Run the prepare script first:\n"
+                "    python prepare_cnmc.py --src_dir <path-to-cnmc-download>\n"
+                + "="*64 + "\n"
+            )
+        print(f"[shared/data] Loading C-NMC 2019 from local path: {data_dir}")
+        train_tf = get_train_transform(cfg["mean"], cfg["std"])
+        eval_tf  = get_eval_transform(cfg["mean"],  cfg["std"])
+        train_ds = LocalImageFolderDataset(data_dir, "train", cfg["class_names"], train_tf)
+        val_ds   = LocalImageFolderDataset(data_dir, "val",   cfg["class_names"], eval_tf)
+        test_ds  = LocalImageFolderDataset(data_dir, "test",  cfg["class_names"], eval_tf)
+        label_map = {i: n for i, n in enumerate(cfg["class_names"])}
+        print(f"[shared/data] C-NMC 2019 — train:{len(train_ds)}, val:{len(val_ds)}, "
+              f"test:{len(test_ds)}, classes:{label_map}")
+        print(f"[shared/data] NOTE: C-NMC is class-imbalanced (~68% ALL, ~32% HEM). "
+              f"Recall on ALL is the key clinical metric.")
+        return (
+            DataLoader(train_ds, batch_size=batch_size, shuffle=True,
+                       num_workers=num_workers, pin_memory=pin_memory, drop_last=False),
+            DataLoader(val_ds,   batch_size=batch_size, shuffle=False,
+                       num_workers=num_workers, pin_memory=pin_memory),
+            DataLoader(test_ds,  batch_size=batch_size, shuffle=False,
+                       num_workers=num_workers, pin_memory=pin_memory),
+            label_map,
+        )
 
-    # Carve a stratified validation set from train (val_fraction = 20%)
-    val_frac = cfg.get("val_fraction", 0.20)
-    split_result = hf_train_full.train_test_split(
-        test_size=val_frac,
-        seed=GLOBAL_SEED,
-        stratify_by_column="label",   # preserves ALL/HEM ratio in both halves
-    )
-    hf_train = split_result["train"]
-    hf_val   = split_result["test"]
-
-    train_tf = get_train_transform(cfg["mean"], cfg["std"])
-    eval_tf  = get_eval_transform(cfg["mean"],  cfg["std"])
-
-    train_ds = HFImageDataset(hf_train, transform=train_tf)
-    val_ds   = HFImageDataset(hf_val,   transform=eval_tf)
-    test_ds  = HFImageDataset(hf_test,  transform=eval_tf)
-
-    label_map = {i: n for i, n in enumerate(cfg["class_names"])}
-    print(f"[shared/data] C-NMC 2019 — train:{len(train_ds)}, val:{len(val_ds)}, "
-          f"test:{len(test_ds)}, classes:{label_map}")
-    print(f"[shared/data] NOTE: C-NMC is class-imbalanced (~68% ALL, ~32% HEM). "
-          f"Monitor per-class sensitivity — recall on ALL is the key clinical metric.")
-
-    return (
-        DataLoader(train_ds, batch_size=batch_size, shuffle=True,
-                   num_workers=num_workers, pin_memory=pin_memory, drop_last=False),
-        DataLoader(val_ds,   batch_size=batch_size, shuffle=False,
-                   num_workers=num_workers, pin_memory=pin_memory),
-        DataLoader(test_ds,  batch_size=batch_size, shuffle=False,
-                   num_workers=num_workers, pin_memory=pin_memory),
-        label_map,
+    raise RuntimeError(
+        "\n\n" + "="*64 + "\n"
+        "  ERROR: C-NMC 2019 requires local files — HuggingFace streaming is broken.\n"
+        "  The HF dataset (dwb2023/cnmc-leukemia-2019) stores only BMP file headers,\n"
+        "  not full images, so it cannot be loaded via the Hub.\n"
+        "="*64 + "\n\n"
+        "  Steps to fix:\n"
+        "  1. Download the C-NMC dataset from Kaggle:\n"
+        "       kaggle datasets download -d SBI-LAB/c-nmc-2019 -p data/cnmc_raw --unzip\n"
+        "  2. Run the prepare script:\n"
+        "       python prepare_cnmc.py --src_dir data/cnmc_raw\n"
+        "  3. Rerun with --data_dir:\n"
+        "       python run_all.py --dataset cnmc --data_dir data/cnmc\n"
+        + "="*64 + "\n"
     )
 
 
@@ -556,9 +601,9 @@ def get_dataloaders(
     if dataset == "raabin":
         return _load_raabin(batch_size, num_workers, cache_dir, pin_memory, data_dir, hf_token)
     elif dataset == "bccd":
-        return _load_bccd(batch_size, num_workers, cache_dir, pin_memory)
+        return _load_bccd(batch_size, num_workers, cache_dir, pin_memory, data_dir)
     elif dataset == "cnmc":
-        return _load_cnmc(batch_size, num_workers, cache_dir, pin_memory, hf_token)
+        return _load_cnmc(batch_size, num_workers, cache_dir, pin_memory, hf_token, data_dir)
     elif dataset == "cytodata":
         return _load_cytodata(data_dir, batch_size, num_workers, pin_memory)
 
