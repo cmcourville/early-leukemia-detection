@@ -64,7 +64,7 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--lr", type=float, default=0.0001,
-        help="Learning rate (default: 0.1)."
+        help="Learning rate (default: 0.0001)."
     )
     parser.add_argument(
         "--weight_decay", type=float, default=1e-4,
@@ -108,7 +108,7 @@ def main() -> None:
         num_classes= num_classes
     )
     model.to(device)
-    model.train_model(train_loader, val_loader, test_loader)
+    model.train_model(train_loader, device)
 
     out_dir = (
         Path(args.output_dir) if args.output_dir

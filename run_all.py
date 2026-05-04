@@ -540,7 +540,8 @@ def _run_single_dataset(args: argparse.Namespace, device: torch.device) -> None:
         print(table)
 
         table_path = out_root / "comparison_table.txt"
-        table_path.write_text(table)
+        with open(table_path, "w", encoding="utf-8") as f:
+            f.write(table)
         print(f"\n[pipeline] Comparison table saved → {table_path}")
 
     print(f"\n[pipeline] {args.dataset.upper()} complete.")

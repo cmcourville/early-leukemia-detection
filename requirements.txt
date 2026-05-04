@@ -1,4 +1,4 @@
-# requirements.txt — BccT Project (CS 534, Team 6)
+# requirements.txt  - CS 534, Team 6)
 # Install with: pip install -r requirements.txt
 
 # ---- Core deep learning ----
@@ -22,3 +22,9 @@ matplotlib>=3.7.0          # confusion matrix and AUROC plots
 
 # ---- Optional: progress bars ----
 tqdm>=4.65.0
+
+
+diffusers>=0.27.0
+accelerate>=0.27.0
+safetensors>=0.4.0
+

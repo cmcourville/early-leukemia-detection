@@ -352,10 +352,10 @@ All commands are run from the project root (`early-leukemia-detection/`).
 
 ```bash
 # Trains + evaluates both models on raabin, cnmc, and bccd sequentially (~4 hrs on GPU)
-python run_all.py --models bcct cytodiffusion --dataset all --device cuda
+python run_all.py --models bcct cytodiffusion vitcnn_ensemble--dataset all --device cuda
 
 # On Colab/cloud with data on Drive, use --data_root to point at the Drive folder:
-python run_all.py --models bcct cytodiffusion --dataset all --data_root /path/to/data/root --device cuda
+python run_all.py --models bcct cytodiffusion vitcnn_ensemble --dataset all --data_root /path/to/data/root --device cuda
 ```
 
 `--dataset all` expects the following folders inside the data root:

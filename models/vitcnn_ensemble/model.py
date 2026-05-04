@@ -62,13 +62,13 @@ class ViTCNNEnsemble(nn.Module):
                  num_classes: int = 8,
                  embedding_dimension: int = 256,
                  num_heads: int = 8,
-                 dropout_rate: float = 0.2,
+                 dropout_rate: float = 0.1,
                  feedforward_dimension: int = 256,
                  freeze_layer_index: str = "Mixed_6e",
                  cnn_logits: bool = False):
         super().__init__()
         """
-        Common Datastructure used for storing the model state helpful for load and save
+        Common Data structure used for storing the model state helpful for load and save
         """
         self.config = {
             "num_classes": num_classes,
@@ -104,7 +104,7 @@ class ViTCNNEnsemble(nn.Module):
         training_accuracy = 0
         training_steps = 0
 
-        optimizer = torch.optim.Adam(self.vit.parameters(), lr=5e-5) #TODO: Check this param
+        optimizer = torch.optim.Adam(self.vit.parameters(), lr=5e-4) #TODO: Check this param
         criterion = nn.CrossEntropyLoss() #TODO: Confirm Loss function with paper
 
         for batch_idx, (images, labels) in enumerate(train_loader):
@@ -112,6 +112,7 @@ class ViTCNNEnsemble(nn.Module):
             optimizer.zero_grad()
             logits = self(images)
             loss = criterion(logits, labels)
+            loss = loss
             loss.backward()
             optimizer.step()
 
@@ -122,6 +123,8 @@ class ViTCNNEnsemble(nn.Module):
             if (batch_idx + 1) % 10 == 0:
                 print(f"    batch {batch_idx + 1}/{len(train_loader)} " f"loss: {loss.item():.4f}  "
                       f"acc: {training_accuracy / training_steps:.4f}")
+
+        self.backbone.aux_logits = False
 
     def save(self, path: str) -> None:
         current_model_state = {
