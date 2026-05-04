@@ -112,7 +112,6 @@ class ViTCNNEnsemble(nn.Module):
             optimizer.zero_grad()
             logits = self(images)
             loss = criterion(logits, labels)
-            loss = loss
             loss.backward()
             optimizer.step()
 
