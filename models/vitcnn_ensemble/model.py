@@ -104,8 +104,8 @@ class ViTCNNEnsemble(nn.Module):
         training_accuracy = 0
         training_steps = 0
 
-        optimizer = torch.optim.Adam(self.vit.parameters(), lr=5e-4) #TODO: Check this param
-        criterion = nn.CrossEntropyLoss() #TODO: Confirm Loss function with paper
+        optimizer = torch.optim.AdamW(self.vit.parameters(), lr=1e-4, weight_decay=1e-4) #Update: Pulled Learning Rate from Paper
+        criterion = nn.CrossEntropyLoss()
 
         for batch_idx, (images, labels) in enumerate(train_loader):
             images, labels = images.to(device), labels.to(device)
@@ -119,7 +119,7 @@ class ViTCNNEnsemble(nn.Module):
             training_accuracy += (logits.argmax(dim=1) == labels).sum().item()
             training_steps += images.size(0)
 
-            if (batch_idx + 1) % 10 == 0:
+            if (batch_idx + 1) % 5 == 0:
                 print(f"    batch {batch_idx + 1}/{len(train_loader)} " f"loss: {loss.item():.4f}  "
                       f"acc: {training_accuracy / training_steps:.4f}")
 
