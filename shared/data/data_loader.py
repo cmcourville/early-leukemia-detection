@@ -563,99 +563,6 @@ def _load_cytodata(
         label_map,
     )
 
-def _load_cnmc(
-    batch_size:  int,
-    num_workers: int,
-    cache_dir:   Optional[str],
-    pin_memory:  bool,
-) -> Tuple[DataLoader, DataLoader, DataLoader, Dict[int, str]]:
-    """Load C-NMC 2019 from HuggingFace. Labels are strings; mapped to ints."""
-    from datasets import load_dataset as _load
-
-    cfg = DATASET_CONFIGS["cnmc"]
-    kw  = {"cache_dir": cache_dir} if cache_dir else {}
-
-    # Label string → int mapping
-    LABEL_MAP = {"hem": 0, "healthy": 0, "normal": 0, "all": 1, "cancer": 1}
-
-    class CNMCDataset(Dataset):
-        def __init__(self, hf_split, transform=None):
-            self.data      = hf_split
-            self.transform = transform
-            sample = self.data[0]
-            self.img_col = next(
-                (k for k in ("image", "img") if k in sample), None
-            )
-            self.lbl_col = next(
-                (k for k in ("label", "labels", "class") if k in sample), None
-            )
-            if self.img_col is None or self.lbl_col is None:
-                raise KeyError(f"Cannot find image/label columns. Keys: {list(sample.keys())}")
-
-        def __len__(self):
-            return len(self.data)
-
-        def __getitem__(self, idx):
-            import io as _io
-            item  = self.data[idx]
-            image = item[self.img_col]
-            try:
-                if isinstance(image, dict):
-                    if image.get("bytes"):
-                        image = Image.open(_io.BytesIO(image["bytes"]))
-                    elif image.get("path"):
-                        image = Image.open(image["path"])
-                    else:
-                        raise ValueError("empty image dict")
-                elif not isinstance(image, Image.Image):
-                    image = Image.fromarray(image)
-                image = image.convert("RGB")
-            except Exception:
-                # Corrupt sample — return a neutral gray placeholder
-                image = Image.new("RGB", (IMAGE_SIZE, IMAGE_SIZE), (128, 128, 128))
-            if self.transform:
-                image = self.transform(image)
-            lbl = item[self.lbl_col]
-            if isinstance(lbl, str):
-                lbl = LABEL_MAP[lbl.lower()]
-            return image, int(lbl)
-
-    print(f"[shared/data] Loading C-NMC 2019 ({cfg['hf_name']}) …")
-    hf_full = _load(cfg["hf_name"], split="train", **kw)
-
-    # Only a train split exists — carve out val (10%) and test (20%) manually
-    n_total = len(hf_full)
-    n_test  = max(1, int(0.20 * n_total))
-    n_val   = max(1, int(0.10 * n_total))
-
-    tmp      = hf_full.train_test_split(test_size=n_test, seed=GLOBAL_SEED)
-    hf_test  = tmp["test"]
-    tmp2     = tmp["train"].train_test_split(test_size=n_val, seed=GLOBAL_SEED)
-    hf_train = tmp2["train"]
-    hf_val   = tmp2["test"]
-
-    train_tf = get_train_transform(cfg["mean"], cfg["std"])
-    eval_tf  = get_eval_transform(cfg["mean"],  cfg["std"])
-
-    train_ds = CNMCDataset(hf_train, transform=train_tf)
-    val_ds   = CNMCDataset(hf_val,   transform=eval_tf)
-    test_ds  = CNMCDataset(hf_test,  transform=eval_tf)
-
-    label_map = {i: n for i, n in enumerate(cfg["class_names"])}
-    print(f"[shared/data] C-NMC — train:{len(train_ds)}, val:{len(val_ds)}, "
-          f"test:{len(test_ds)}, classes:{label_map}")
-
-    # num_workers=0: keep decoding in main process to avoid corrupt-image
-    # crashes propagating from worker processes.
-    return (
-        DataLoader(train_ds, batch_size=batch_size, shuffle=True,
-                   num_workers=0, pin_memory=pin_memory, drop_last=False),
-        DataLoader(val_ds,   batch_size=batch_size, shuffle=False,
-                   num_workers=0, pin_memory=pin_memory),
-        DataLoader(test_ds,  batch_size=batch_size, shuffle=False,
-                   num_workers=0, pin_memory=pin_memory),
-        label_map,
-    )
 
 
 # Public API
@@ -701,8 +608,6 @@ def get_dataloaders(
         return _load_cnmc(batch_size, num_workers, cache_dir, pin_memory, hf_token, data_dir)
     elif dataset == "cytodata":
         return _load_cytodata(data_dir, batch_size, num_workers, pin_memory)
-    elif dataset == "cnmc":
-        return _load_cnmc(batch_size, num_workers, cache_dir, pin_memory)
 
 
 def get_few_shot_loaders(
