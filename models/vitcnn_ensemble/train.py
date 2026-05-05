@@ -28,7 +28,6 @@ from shared.config import (
 )
 import argparse
 import torch
-from typing import Optional
 from pathlib import Path
 
 from model import ViTCNNEnsemble
@@ -59,12 +58,8 @@ def get_args() -> argparse.Namespace:
         help="HuggingFace dataset/model cache directory."
     )
     parser.add_argument(
-        "--epochs", type=int, default=25,
-        help="Target number of epochs (default: 25)."
-    )
-    parser.add_argument(
-        "--lr", type=float, default=0.0001,
-        help="Learning rate (default: 0.0001)."
+        "--epochs", type=int, default=15,
+        help="Target number of epochs (default: 15)."
     )
     parser.add_argument(
         "--weight_decay", type=float, default=1e-4,
@@ -105,8 +100,11 @@ def main() -> None:
     )
 
     model = ViTCNNEnsemble(
-        num_classes= num_classes
+        num_classes= num_classes,
+        cnn_logits=True,
+        training_epochs=args.epochs,
     )
+
     model.to(device)
     model.train_model(train_loader, device)
 

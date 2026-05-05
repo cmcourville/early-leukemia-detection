@@ -17,7 +17,7 @@ Comparative study of three deep learning approaches for early leukemia detection
 | Raabin-WBC local dataset | Corrin | ✅ Available | `data/raabin/` — run `prepare_raabin.py` to split |
 | CytoData local dataset | Corrin | ✅ Available | `data/cytodata/` — 3,500 / 494 / 1,000 train/val/test, 10 classes |
 | CytoDiffusion model code | Darshan | ✅ Complete | `models/cytodiffusion/` — implemented and integrated into pipeline |
-| ViT-CNN Ensemble model code | Sean | ❌ Stub only | `models/vitcnn_ensemble/` — raises NotImplementedError |
+| ViT-CNN Ensemble model code | Sean | ✅ Complete | `models/vitcnn_ensemble/` — raises NotImplementedError |
 
 ### Experiment Results — Current State
 

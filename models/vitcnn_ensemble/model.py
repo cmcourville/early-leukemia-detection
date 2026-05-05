@@ -4,10 +4,6 @@ Author: Sean
 
 ViT-CNN Ensemble model for WBC classification.
 
-=============================================================================
-  TODO (Sean): Implement the ViT-CNN Ensemble model here.
-=============================================================================
-
 Suggested class interface (mirrors BccTModel so run_all.py can call all
 three models the same way):
 
@@ -38,13 +34,8 @@ The pipeline in run_all.py will call:
 Shared utilities to import:
     from shared.data.data_loader import get_dataloaders, get_few_shot_loaders
     from shared.metrics import compute_all_metrics, print_metrics
-    from shared.config import NUM_CLASSES, VIT_BACKBONE_ID
-"""
-from torch._dynamo.variables import optimizer
+   VIT_BACKBONE_ID
 
-"""
-Author: Sean St.Pierre
-Class: CS534
 This CNN model is based on the model from:Alshehri, O.M., Shaf, A., Irfan, M., Jalal, M.M., Altayar, M.A. et al. (2025).
 A Hybrid CNN-Transformer Framework for Normal Blood Cell Classification: Towards Automated Hematological Analysis. Computer Modeling in Engineering & Sciences,
 144(1), 1165–1196. https://doi.org/10.32604/cmes.2025.067150
@@ -62,10 +53,11 @@ class ViTCNNEnsemble(nn.Module):
                  num_classes: int = 8,
                  embedding_dimension: int = 256,
                  num_heads: int = 8,
-                 dropout_rate: float = 0.1,
+                 dropout_rate: float = 0.2,
                  feedforward_dimension: int = 256,
-                 freeze_layer_index: str = "Mixed_6e",
-                 cnn_logits: bool = False):
+                 freeze_layer_index: str = "Mixed_5d",
+                 cnn_logits: bool = True,
+                 training_epochs: int = 15,):
         super().__init__()
         """
         Common Data structure used for storing the model state helpful for load and save
@@ -76,15 +68,21 @@ class ViTCNNEnsemble(nn.Module):
             "num_heads": num_heads,
             "dropout_rate": dropout_rate,
             "feedforward_dimension": feedforward_dimension,
-            "freeze_layer_index": freeze_layer_index
+            "freeze_layer_index": freeze_layer_index,
+            "training_epochs": training_epochs
         }
-
         self.backbone = InceptionNetV3Backbone(logits_setting=cnn_logits, frozen_layer_index=freeze_layer_index)
+        """
+        ViT Configuration were pulled from paper matching the custom transformer developed
+        """
         self.vit = ViT(input_dimension=2048,  # fixed value as this is the output size of inceptionNetV3
                        num_heads=num_heads,
                        embedding_dimension=embedding_dimension,
                        dropout_rate=dropout_rate,
                        feedforward_dimension=feedforward_dimension)
+        """
+        Classifier match those described in the paper
+        """
         self.classifier = nn.Sequential(
             nn.Linear(embedding_dimension, 128),
             nn.GELU(),
@@ -104,25 +102,35 @@ class ViTCNNEnsemble(nn.Module):
         training_accuracy = 0
         training_steps = 0
 
-        optimizer = torch.optim.AdamW(self.vit.parameters(), lr=1e-4, weight_decay=1e-4) #Update: Pulled Learning Rate from Paper
+        """
+        AdamW optimizer used with custom Learning Rates for CNN Backbone, ViT, and Classifier
+        parameters below match that of the paper
+        """
+        optimizer = torch.optim.AdamW([
+            {"params": self.backbone.parameters(), "lr":1e-5},
+            {"params": self.vit.parameters(), "lr":1e-4},
+            {"params": self.classifier.parameters(), "lr":1e-4}], weight_decay=1e-4)
         criterion = nn.CrossEntropyLoss()
 
-        for batch_idx, (images, labels) in enumerate(train_loader):
-            images, labels = images.to(device), labels.to(device)
-            optimizer.zero_grad()
-            logits = self(images)
-            loss = criterion(logits, labels)
-            loss.backward()
-            optimizer.step()
+        for epoch in range(1, int(self.config["training_epochs"])+1):
+            epoch_loss = 0
+            for batch_idx, (images, labels) in enumerate(train_loader):
+                images, labels = images.to(device), labels.to(device)
+                optimizer.zero_grad()
+                logits = self(images)
+                loss = criterion(logits, labels)
+                loss.backward()
+                optimizer.step()
+                epoch_loss = loss.item()
+                training_loss += loss.item() * images.size(0) #TODO Check this
+                training_accuracy += (logits.argmax(dim=1) == labels).sum().item()
+                training_steps += images.size(0)
 
-            training_loss += loss.item() * images.size(0) #TODO Check this
-            training_accuracy += (logits.argmax(dim=1) == labels).sum().item()
-            training_steps += images.size(0)
-
-            if (batch_idx + 1) % 5 == 0:
-                print(f"    batch {batch_idx + 1}/{len(train_loader)} " f"loss: {loss.item():.4f}  "
-                      f"acc: {training_accuracy / training_steps:.4f}")
-
+            print("=" * 64)
+            print(f"Epoch {epoch}/{int(self.config["training_epochs"])} ")
+            print(f"Training loss: {epoch_loss:.4f} ")
+            print(f"Training accuracy: {training_accuracy / training_steps:.4f}")
+            print("=" * 64)
         self.backbone.aux_logits = False
 
     def save(self, path: str) -> None:
