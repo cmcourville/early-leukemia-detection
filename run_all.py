@@ -38,7 +38,6 @@ from __future__ import annotations
 import argparse
 import inspect
 import json
-import os
 import sys
 import time
 import traceback
@@ -61,7 +60,7 @@ from shared.config import (
     LOW_DATA_SHOTS, LOW_DATA_REPEATS,
     GLOBAL_SEED, RESULTS_ROOT, DATASET_CONFIGS,
 )
-from shared.data.data_loader import get_dataloaders, get_few_shot_loaders
+from shared.data import get_dataloaders, get_few_shot_loaders
 from shared.metrics import (
     compute_all_metrics, print_metrics, save_metrics,
     save_confusion_matrix_plot, save_auroc_plot, format_comparison_table,
@@ -446,7 +445,7 @@ def _run_single_dataset(args: argparse.Namespace, device: torch.device) -> None:
         hf_token=getattr(args, "hf_token", None),
     )
     class_names = [label_map[i] for i in sorted(label_map.keys())]
-
+    print(f"{class_names}")
     # Results go into a dataset-specific subdirectory so runs don't overwrite each other
     # e.g. shared/results/raabin/bcct/  or  shared/results/cnmc/bcct/
     out_root = PROJECT_ROOT / args.output_dir / args.dataset

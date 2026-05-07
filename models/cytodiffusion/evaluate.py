@@ -29,7 +29,7 @@ sys.path.insert(0, str(_PROJECT_ROOT / "models"))
 from shared.config import (
     CHECKPOINT_DIRS, DATASET_CONFIGS, GLOBAL_SEED, RESULTS_ROOT,
 )
-from shared.data.data_loader import get_dataloaders
+from shared.data import get_dataloaders
 from shared.metrics import (
     compute_all_metrics, print_metrics, save_metrics,
     save_confusion_matrix_plot, save_auroc_plot,

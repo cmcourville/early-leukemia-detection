@@ -38,7 +38,7 @@ from pathlib import Path
 from PIL import Image
 
 GITHUB_ZIP = "https://github.com/Shenggan/BCCD_Dataset/archive/refs/heads/master.zip"
-CLASSES    = ["Platelet", "RBC", "WBC"]
+CLASSES    = ["Platelets", "RBC", "WBC"]
 MIN_CROP   = 8      # skip bounding boxes smaller than this in either dimension
 
 

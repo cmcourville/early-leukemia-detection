@@ -101,7 +101,7 @@ DATASET_CONFIGS = {
         "display_name": "BCCD",
         "hf_name":      "keremberke/blood-cell-object-detection",
         "num_classes":  3,
-        "class_names":  ["Platelet", "RBC", "WBC"],
+        "class_names":  ["Platelets", "RBC", "WBC"],
         "mean":         [0.485, 0.456, 0.406],  # ImageNet defaults (stats not pre-computed)
         "std":          [0.229, 0.224, 0.225],
         "source":       "huggingface_detection",  # detection → crop each bbox for classification

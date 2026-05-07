@@ -148,7 +148,6 @@ class ViTCNNEnsemble(nn.Module):
         model.load_state_dict(current_model_state["model_state_dict"])
         model.to(device)
         print(f"Loaded model from {path}")
-        print(f"Current model state: {current_model_state}")
 
         return model
 

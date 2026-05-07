@@ -18,7 +18,6 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-import torch
 from torch.utils.data import DataLoader
 
 # Make shared/ importable from models/bcct/
@@ -28,7 +27,7 @@ for _p in [str(_project_root), str(_shared_dir)]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from shared.data.data_loader import (
+from shared.data import (
     get_dataloaders      as _get_dataloaders,
     get_few_shot_loaders as _get_few_shot_loaders,
     get_train_transform,

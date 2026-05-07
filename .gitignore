@@ -218,5 +218,5 @@ shared/results/
 **/checkpoints/
 
 # Local datasets
-data/
+shared/data/
 shared/data/

@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 class VitMultiAttentionHead(nn.Module):
-    def __init__(self, embedded_dimension: int = 8, number_of_heads: int = 8, dropout_rate: float = 0.2):
+    def __init__(self, embedded_dimension: int = 256, number_of_heads: int = 8, dropout_rate: float = 0.2):
         super().__init__()
         self.num_heads = number_of_heads
         self.head_dim = embedded_dimension // number_of_heads

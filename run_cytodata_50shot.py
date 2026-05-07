@@ -44,7 +44,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "shared"))
 sys.path.insert(0, str(PROJECT_ROOT / "models" / "bcct"))
 
-from shared.data.data_loader import get_dataloaders, get_few_shot_loaders
+from shared.data import get_dataloaders, get_few_shot_loaders
 from shared.metrics import compute_all_metrics
 from bcct_model import BccTModel
 from token_fusion import reset_token_sizes

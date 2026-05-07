@@ -22,10 +22,9 @@ Shared data loading:
 
 Suggested checkpoint save location: checkpoints/vitcnn_ensemble_model.pt
 """
-from shared.data.data_loader import get_dataloaders
+from shared.data import get_dataloaders
 from shared.config import (
-    CHECKPOINT_DIRS, DATASET_CONFIGS, GLOBAL_SEED,
-)
+    CHECKPOINT_DIRS, DATASET_CONFIGS, )
 import argparse
 import torch
 from pathlib import Path

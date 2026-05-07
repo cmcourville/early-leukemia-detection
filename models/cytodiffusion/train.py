@@ -29,7 +29,7 @@ sys.path.insert(0, str(_PROJECT_ROOT / "models"))
 from shared.config import (
     CHECKPOINT_DIRS, DATASET_CONFIGS, GLOBAL_SEED,
 )
-from shared.data.data_loader import get_dataloaders
+from shared.data import get_dataloaders
 from cytodiffusion.model import CytoDiffusionModel
 
 

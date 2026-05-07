@@ -171,7 +171,7 @@ class BCCDCellDataset(Dataset):
 
     # Category ID → class index mapping for keremberke BCCD
     CATEGORY_TO_IDX = {0: 0, 1: 1, 2: 2}  # Platelet=0, RBC=1, WBC=2
-    CLASS_NAMES = ["Platelet", "RBC", "WBC"]
+    CLASS_NAMES = ["Platelets", "RBC", "WBC"]
 
     def __init__(self, hf_split, transform=None, min_crop_px: int = 8):
         self.transform    = transform

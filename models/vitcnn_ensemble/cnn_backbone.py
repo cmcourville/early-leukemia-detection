@@ -70,7 +70,6 @@ class InceptionNetV3Backbone(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         features = self.features(x)
-        batch, channels, height, width = x.shape
         tokens = features.flatten(2).transpose(1, 2)
         return tokens
 
