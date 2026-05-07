@@ -4,9 +4,9 @@ Comparative study of three deep learning approaches for early leukemia detection
 
 ---
 
-## Project Status (as of April 30, 2026)
+## Project Status (as of May 6, 2026)
 
-> **Phase 3 is in progress.** Slides + video due **May 5, 2026**. Live presentation + demo **May 6, 2026 (6–9 PM)**.
+> **Phase 3 complete.** Live presentation + demo delivered **May 6, 2026**.
 
 ### Implementation Status
 
@@ -17,7 +17,7 @@ Comparative study of three deep learning approaches for early leukemia detection
 | Raabin-WBC local dataset | Corrin | ✅ Available | `data/raabin/` — run `prepare_raabin.py` to split |
 | CytoData local dataset | Corrin | ✅ Available | `data/cytodata/` — 3,500 / 494 / 1,000 train/val/test, 10 classes |
 | CytoDiffusion model code | Darshan | ✅ Complete | `models/cytodiffusion/` — implemented and integrated into pipeline |
-| ViT-CNN Ensemble model code | Sean | ✅ Complete | `models/vitcnn_ensemble/` — raises NotImplementedError |
+| ViT-CNN Ensemble model code | Sean | ✅ Complete | `models/vitcnn_ensemble/` — fully implemented and integrated into pipeline |
 
 ### Experiment Results — Current State
 
@@ -119,9 +119,9 @@ Content included:
 - **11 new APA references** (all 2007–2021, published journals)
 - **Formatting checklist** (margins, font, page count, consistency items)
 
-**4. 🔴 Cross-model comparison once Sean's model is ready**
+**4. ✅ ~~Cross-model comparison pipeline — READY~~**
 
-CytoDiffusion is now fully integrated. Once Sean uncomments his registry entry in `run_all.py`:
+All three models are now integrated and active in `run_all.py`. To run the full cross-model comparison:
 
 ```bash
 python run_all.py --dataset raabin --data_dir data/raabin --mode full_pipeline
@@ -146,6 +146,7 @@ Upload to YouTube (unlisted) or Google Drive (shareable link).
 
 | Date | Author | Change |
 |------|--------|--------|
+| May 6, 2026 | Corrin | Confirmed ViT-CNN Ensemble fully implemented by Sean. Updated README: Sean's status changed from 🔲 Stub to ✅ Implemented in Team table and Implementation Status table, removed "stubs only" from repository structure, marked cross-model comparison pipeline item complete (all three models active in `run_all.py` registry). Updated project status to reflect Phase 3 complete. |
 | Apr 30, 2026 | Corrin | Integrated CytoDiffusion into `run_all.py` pipeline. Changes: `run_train()` now passes `val_loader`, dataset-correct `img_mean`/`img_std`, and `cache_dir` to each model constructor; uses `inspect.signature` to pass `val_loader` only to models that declare it (backward-compatible with BccT). CytoDiffusion registry constructor updated to forward those kwargs. `CytoDiffusionModel.__init__` now accepts `cache_dir` and passes it to `AutoencoderKL.from_pretrained()`. README updated: CytoDiffusion marked ✅ Complete, added How CytoDiffusion Works section, updated Adding Your Model to Sean-only. |
 | Apr 21, 2026 | Corrin | Wrote all missing final paper sections flagged for professor grade deductions — saved to `paper_additions_draft.md`. Includes: Abstract (≤200 words), Keywords (10 terms), target demographic + global epidemiology with citations, 3 real-world outcome examples (Krull 2013 neurocognitive, van der Pal 2012 cardiotoxicity, Bhatia 2007 secondary malignancy), disadvantages for all 3 SOTA methods, 11 new APA references, and a formatting checklist. README updated: marked step 3 ✅ COMPLETE, renumbered remaining steps. |
 | Apr 18, 2026 | Corrin | Built Phase 3 slides for Corrin's sections — 8-slide PPTX at `corrin_phase3_slides.pptx`. Covers BccT method (Token Fusion + FRC), pipeline diagram, Raabin-WBC results, CytoData results, low-data n-shot performance, conclusions, and future work. All metrics drawn from completed experiment results in `shared/results/`. Marked Build Phase 3 slides ✅ COMPLETE in Remaining Steps. |
@@ -162,7 +163,7 @@ Upload to YouTube (unlisted) or Google Drive (shareable link).
 |----------|-------|--------|-----------|
 | Corrin | **BccT** — Blood Cell Classification Transformer (Zhu et al. 2026) | ✅ Implemented | `models/bcct/` |
 | Darshan | **CytoDiffusion** — Latent Diffusion-based classifier | ✅ Implemented | `models/cytodiffusion/` |
-| Sean | **ViT-CNN Ensemble** — Hybrid Vision Transformer + CNN | 🔲 Stub | `models/vitcnn_ensemble/` |
+| Sean | **ViT-CNN Ensemble** — Hybrid Vision Transformer + CNN | ✅ Implemented | `models/vitcnn_ensemble/` |
 
 ---
 
@@ -209,7 +210,6 @@ early-leukemia-detection/
     │   ├── evaluate_bcct.py          # Evaluation script (metrics + confusion matrix + AUROC plots)
     │   ├── low_data_test.py          # N-shot / low-data regime experiments
     │   ├── main.py                   # BccT CLI entry point (train / evaluate / low_data / full_pipeline)
-    │   ├── requirements.txt          # BccT-specific dependencies
     │   └── checkpoints/              # Saved model weights (gitignored)
     │
     ├── cytodiffusion/                # CytoDiffusion (Darshan) — fully implemented
@@ -219,11 +219,11 @@ early-leukemia-detection/
     │   ├── requirements.txt
     │   └── checkpoints/
     │
-    └── vitcnn_ensemble/              # ViT-CNN Ensemble (Sean) — stubs only
-        ├── model.py
-        ├── train.py
-        ├── evaluate.py
-        ├── requirements.txt
+    └── vitcnn_ensemble/              # ViT-CNN Ensemble (Sean) — fully implemented
+        ├── model.py                  # ViTCNNEnsemble: InceptionV3 backbone + custom ViT + classifier
+        ├── cnn_backbone.py           # InceptionNetV3Backbone with partial layer freezing
+        ├── vit_model.py              # Custom ViT: multi-head attention + transformer blocks
+        ├── train.py                  # Standalone training script
         └── checkpoints/
 ```
 
@@ -352,7 +352,7 @@ All commands are run from the project root (`early-leukemia-detection/`).
 
 ```bash
 # Trains + evaluates both models on raabin, cnmc, and bccd sequentially (~4 hrs on GPU)
-python run_all.py --models bcct cytodiffusion vitcnn_ensemble--dataset all --device cuda
+python run_all.py --models bcct cytodiffusion vitcnn_ensemble --dataset all --device cuda
 
 # On Colab/cloud with data on Drive, use --data_root to point at the Drive folder:
 python run_all.py --models bcct cytodiffusion vitcnn_ensemble --dataset all --data_root /path/to/data/root --device cuda
@@ -547,7 +547,7 @@ Accuracy        0.9341    —              —
 Macro F1        0.9289    —              —
 ...
 ```
-The cross-model comparison table. Dashes appear for models whose stubs raised `NotImplementedError`. This table is the core Phase 3 deliverable — it will fill in once teammates implement their models.
+The cross-model comparison table. All three models are active and will populate every column when run together.
 
 ### Output Files
 
@@ -564,7 +564,7 @@ shared/results/
 │       ├── 20shot/avg_metrics.json
 │       └── 50shot/avg_metrics.json
 ├── cytodiffusion/                    # Populated by CytoDiffusion runs
-├── vitcnn_ensemble/                  # Populated when Sean's model is ready
+├── vitcnn_ensemble/                  # Populated by ViT-CNN Ensemble runs
 └── comparison_table.txt              # Side-by-side ASCII table (all models)
 ```
 
@@ -666,15 +666,14 @@ python run_all.py --models cytodiffusion --dataset raabin --data_dir data/raabin
 
 ---
 
-## Adding Your Model (Sean)
+## Adding a New Model
 
-CytoDiffusion is already integrated. For ViT-CNN Ensemble:
+All three models (BccT, CytoDiffusion, ViT-CNN Ensemble) are fully integrated. To add a fourth model to the pipeline:
 
-1. Implement `model.py`, `train.py`, and `evaluate.py` in `models/vitcnn_ensemble/`. The interface each model must satisfy: `__init__`, `train_model(loader, device)`, `forward(x)`, `save(path)`, `load(path, device)`.
-2. Use `shared/data/data_loader.py` for data loading and `shared/metrics.py` for evaluation — this keeps all results directly comparable.
-3. In `run_all.py`, uncomment the `vitcnn_ensemble` import line and registry entry (both marked `# UNCOMMENT WHEN READY`).
-4. Add your dependencies to `models/vitcnn_ensemble/requirements.txt`.
-5. Test in isolation first: `python run_all.py --models vitcnn_ensemble --dataset bccd --mode train`
+1. Create a directory under `models/your_model/` and implement `model.py`. The required interface: `__init__`, `train_model(loader, device)`, `forward(x)`, `save(path)`, `load(path, device)`.
+2. Use `shared/data/data_loader.py` for data loading and `shared/metrics.py` for evaluation to keep results directly comparable.
+3. In `run_all.py`, add an import and a new entry to `MODEL_REGISTRY` following the pattern of the existing three entries.
+4. Test in isolation first: `python run_all.py --models your_model --dataset bccd --mode train`
 
 ---
 
