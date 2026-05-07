@@ -2,6 +2,8 @@
 .DS_Store
 **/.DS_Store
 
+# pycharm
+.idea/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -216,4 +218,5 @@ shared/results/
 **/checkpoints/
 
 # Local datasets
-data/
+shared/data/
+shared/data/

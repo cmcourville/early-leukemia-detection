@@ -1,8 +1,0 @@
-# models/vitcnn_ensemble/requirements.txt
-# TODO (Sean): add model-specific dependencies here.
-#
-# Likely candidates for a ViT-CNN ensemble:
-#   timm>=0.9.0                # PyTorch Image Models (ViT variants, CNN backbones)
-#
-# All models share the base requirements — install from project root first:
-#   pip install -r shared/requirements.txt

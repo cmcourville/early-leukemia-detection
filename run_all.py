@@ -38,7 +38,6 @@ from __future__ import annotations
 import argparse
 import inspect
 import json
-import os
 import sys
 import time
 import traceback
@@ -54,14 +53,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "shared"))
 sys.path.insert(0, str(PROJECT_ROOT / "models" / "bcct"))
-sys.path.insert(0, str(PROJECT_ROOT / "models"))                        # cytodiffusion + vitcnn_ensemble
-# sys.path.insert(0, str(PROJECT_ROOT / "models" / "vitcnn_ensemble")) # UNCOMMENT WHEN READY
+sys.path.insert(0, str(PROJECT_ROOT / "models"))          # cytodiffusion + vitcnn_ensemble
+sys.path.insert(0, str(PROJECT_ROOT / "models" / "vitcnn_ensemble")) # Active
 
 from shared.config import (
     LOW_DATA_SHOTS, LOW_DATA_REPEATS,
     GLOBAL_SEED, RESULTS_ROOT, DATASET_CONFIGS,
 )
-from shared.data.data_loader import get_dataloaders, get_few_shot_loaders
+from shared.data import get_dataloaders, get_few_shot_loaders
 from shared.metrics import (
     compute_all_metrics, print_metrics, save_metrics,
     save_confusion_matrix_plot, save_auroc_plot, format_comparison_table,
@@ -78,7 +77,7 @@ from cytodiffusion.model import CytoDiffusionModel
 
 # ViT-CNN Ensemble (Sean) — NOT YET IMPLEMENTED
 # UNCOMMENT WHEN READY:
-# from vitcnn_ensemble.model import ViTCNNEnsemble
+from vitcnn_ensemble.model import ViTCNNEnsemble
 
 # Model registry
 # Each entry describes how to construct, train, and checkpoint a model.
@@ -113,17 +112,18 @@ MODEL_REGISTRY = {
         "load_fn":  lambda path, device: CytoDiffusionModel.load(path, device),
     },
 
-    # ViT-CNN Ensemble (Sean) — UNCOMMENT WHEN READY
-    # "vitcnn_ensemble": {
-    #     "name":        "ViT-CNN Ensemble (Sean)",
-    #     "active":      True,
-    #     "constructor": lambda num_classes, **kw: ViTCNNEnsemble(
-    #         num_classes=num_classes,
-    #     ),
-    #     "checkpoint_path": "models/vitcnn_ensemble/checkpoints/vitcnn_ensemble_model.pt",
-    #     "save_fn":  lambda model, path: model.save(path),
-    #     "load_fn":  lambda path, device: ViTCNNEnsemble.load(path, device),
-    # },
+     #ViT-CNN Ensemble (Sean) — UNCOMMENT WHEN READY
+     "vitcnn_ensemble": {
+         "name":        "ViT-CNN Ensemble (Sean)",
+         "active":      True,
+         "constructor": lambda num_classes, **kw: ViTCNNEnsemble(
+             num_classes=num_classes,
+             cnn_logits=True,
+         ),
+         "checkpoint_path": "models/vitcnn_ensemble/checkpoints/vitcnn_ensemble_model.pt",
+         "save_fn":  lambda model, path: model.save(path),
+         "load_fn":  lambda path, device: ViTCNNEnsemble.load(path, device),
+     },
 }
 
 # Argument parsing
@@ -228,14 +228,9 @@ def run_train(
     print(f"  TRAINING: {entry['name']}")
     print(f"{'='*64}")
 
-    ds_cfg = DATASET_CONFIGS[args.dataset]
-    num_classes = ds_cfg["num_classes"]
-    model = entry["constructor"](
-        num_classes=num_classes,
-        cache_dir=args.cache_dir,
-        img_mean=ds_cfg["mean"],
-        img_std=ds_cfg["std"],
-    )
+    num_classes = DATASET_CONFIGS[args.dataset]["num_classes"]
+    model = entry["constructor"](num_classes=num_classes)
+    model.to(device)
 
     t0 = time.time()
     sig = inspect.signature(model.train_model)
@@ -450,7 +445,7 @@ def _run_single_dataset(args: argparse.Namespace, device: torch.device) -> None:
         hf_token=getattr(args, "hf_token", None),
     )
     class_names = [label_map[i] for i in sorted(label_map.keys())]
-
+    print(f"{class_names}")
     # Results go into a dataset-specific subdirectory so runs don't overwrite each other
     # e.g. shared/results/raabin/bcct/  or  shared/results/cnmc/bcct/
     out_root = PROJECT_ROOT / args.output_dir / args.dataset
@@ -544,7 +539,8 @@ def _run_single_dataset(args: argparse.Namespace, device: torch.device) -> None:
         print(table)
 
         table_path = out_root / "comparison_table.txt"
-        table_path.write_text(table)
+        with open(table_path, "w", encoding="utf-8") as f:
+            f.write(table)
         print(f"\n[pipeline] Comparison table saved → {table_path}")
 
     print(f"\n[pipeline] {args.dataset.upper()} complete.")

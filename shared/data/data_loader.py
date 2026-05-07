@@ -171,7 +171,7 @@ class BCCDCellDataset(Dataset):
 
     # Category ID → class index mapping for keremberke BCCD
     CATEGORY_TO_IDX = {0: 0, 1: 1, 2: 2}  # Platelet=0, RBC=1, WBC=2
-    CLASS_NAMES = ["Platelet", "RBC", "WBC"]
+    CLASS_NAMES = ["Platelets", "RBC", "WBC"]
 
     def __init__(self, hf_split, transform=None, min_crop_px: int = 8):
         self.transform    = transform
@@ -563,8 +563,6 @@ def _load_cytodata(
         label_map,
     )
 
-
-
 # Public API
 
 def get_dataloaders(
@@ -608,6 +606,7 @@ def get_dataloaders(
         return _load_cnmc(batch_size, num_workers, cache_dir, pin_memory, hf_token, data_dir)
     elif dataset == "cytodata":
         return _load_cytodata(data_dir, batch_size, num_workers, pin_memory)
+
 
 
 def get_few_shot_loaders(

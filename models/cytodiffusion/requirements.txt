@@ -1,7 +1,0 @@
-# models/cytodiffusion/requirements.txt
-# Install shared requirements first:  pip install -r shared/requirements.txt
-# Then install these model-specific dependencies:
-diffusers>=0.27.0
-accelerate>=0.27.0
-safetensors>=0.4.0
-transformers>=4.37.0
